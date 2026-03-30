@@ -1,4 +1,4 @@
-# AGENTS.md: OpenCode Chromium Extension Agent Architecture
+# OpenCode Chromium Extension Agent Architecture
 
 This document defines the logical entities (agents) responsible for executing the browser extension's operations within the OpenCode architecture. It strictly delineates their roles, responsibilities, and operational constraints, ensuring full compatibility with the **Gentleman Ecosystem**, including Spec-Driven Development (SDD) workflows and Engram-based persistence.
 
