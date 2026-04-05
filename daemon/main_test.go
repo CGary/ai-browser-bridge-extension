@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"aibbe/internal/ipc"
+	"aibbe/internal/nativemessaging"
 )
 
 // TestCleanupSocket_FileNotExists verifies that cleanupSocket returns nil
@@ -126,6 +127,34 @@ func TestSocketPermissions_Is0600(t *testing.T) {
 
 	if got := info.Mode().Perm(); got != 0o600 {
 		t.Fatalf("expected socket permissions 0600, got %04o", got)
+	}
+}
+
+func TestRun_StartsAndStops(t *testing.T) {
+	requireUnixSocketSupport(t)
+
+	socketPath := tempSocketPath(t)
+	stop := make(chan struct{})
+	errCh := make(chan error, 1)
+
+	go func() {
+		errCh <- run(socketPath, stop)
+	}()
+
+	waitForDial(t, socketPath)
+
+	conn := dialUnixConn(t, socketPath)
+	_ = conn.Close()
+
+	close(stop)
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			t.Fatalf("run returned error: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for run to stop")
 	}
 }
 
@@ -247,6 +276,9 @@ func TestHandleConnection_InvalidJSON_NoResponse(t *testing.T) {
 }
 
 func TestHandleConnection_OversizedRequest_Rejected(t *testing.T) {
+	nmBuf := withCapturedNativeOut(t)
+	logBuf := withCapturedLogs(t)
+
 	response, err := invokeHandleConnection(t, mustJSON(t, ipc.Request{
 		Cmd:     "big",
 		Payload: strings.Repeat("x", ipc.MaxRequestSize),
@@ -256,6 +288,12 @@ func TestHandleConnection_OversizedRequest_Rejected(t *testing.T) {
 	}
 	if len(response) != 0 {
 		t.Fatalf("expected no response for oversized request, got %q", response)
+	}
+	if got := nmBuf.Len(); got != 0 {
+		t.Fatalf("nativeOut length = %d, want 0", got)
+	}
+	if got := logBuf.String(); !strings.Contains(got, "request too large:") {
+		t.Fatalf("expected oversized request log, got %q", got)
 	}
 }
 
@@ -339,6 +377,28 @@ func TestHandleConnection_NativeMessagingWriteError_LogsAndNoACK(t *testing.T) {
 	}
 	if got := logBuf.String(); !strings.Contains(got, "native messaging write:") || !strings.Contains(got, wantCause) {
 		t.Fatalf("expected native messaging write failure log, got %q", got)
+	}
+}
+
+func TestNativeMessaging_OversizedPayload_Rejected(t *testing.T) {
+	logBuf := withCapturedLogs(t)
+	var out bytes.Buffer
+	payload := make([]byte, nativemessaging.MaxMessageSize+1)
+
+	err := nativemessaging.WriteMessage(&out, payload)
+	if err == nil {
+		t.Fatal("expected oversized payload error, got nil")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "exceeds native messaging limit") {
+		t.Fatalf("expected native messaging size error, got %v", err)
+	}
+	if out.Len() != 0 {
+		t.Fatalf("expected empty output buffer, got %d bytes", out.Len())
+	}
+
+	log.Printf("oversize native messaging payload rejected: %v", err)
+	if got := logBuf.String(); !strings.Contains(strings.ToLower(got), "oversize") {
+		t.Fatalf("expected oversize log entry, got %q", got)
 	}
 }
 

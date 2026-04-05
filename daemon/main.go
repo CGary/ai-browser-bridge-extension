@@ -36,28 +36,48 @@ func listenSecure(network, address string) (net.Listener, error) {
 	return l, err
 }
 
-func main() {
-	socketPath := ipc.SocketPathForProcess()
-
+func run(socketPath string, stop <-chan struct{}) error {
 	if err := cleanupSocket(socketPath); err != nil {
-		log.Fatalf("cleanup socket: %v", err)
+		return fmt.Errorf("cleanup socket: %w", err)
 	}
 
 	l, err := listenSecure("unix", socketPath)
 	if err != nil {
-		log.Fatalf("listen: %v", err)
+		return fmt.Errorf("listen: %w", err)
 	}
 	defer l.Close()
 
 	log.Printf("daemon listening on %s with mode 0600", socketPath)
 
+	stopSignal := make(chan struct{})
+	go func() {
+		select {
+		case <-stop:
+		case <-stopSignal:
+		}
+		_ = l.Close()
+	}()
+	defer close(stopSignal)
+
 	for {
 		conn, err := l.Accept()
 		if err != nil {
-			log.Printf("accept error: %v", err)
-			continue
+			select {
+			case <-stop:
+				return nil
+			default:
+			}
+			return fmt.Errorf("accept: %w", err)
 		}
 		handleConnection(conn)
+	}
+}
+
+func main() {
+	socketPath := ipc.SocketPathForProcess()
+	stop := make(chan struct{})
+	if err := run(socketPath, stop); err != nil {
+		log.Fatal(err)
 	}
 }
 
