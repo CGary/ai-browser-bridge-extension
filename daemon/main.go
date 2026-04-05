@@ -10,7 +10,12 @@ import (
 	"syscall"
 
 	"aibbe/internal/ipc"
+	"aibbe/internal/nativemessaging"
 )
+
+// nativeOut is the writer for Native Messaging output.
+// Production uses os.Stdout; tests override it with a buffer.
+var nativeOut io.Writer = os.Stdout
 
 // cleanupSocket removes the socket file at socketPath if it exists.
 // Returns nil if the file does not exist (os.IsNotExist).
@@ -76,7 +81,17 @@ func handleConnection(conn net.Conn) {
 		return
 	}
 
+	if req.Cmd == "" {
+		log.Printf("missing required field: cmd")
+		return
+	}
+
 	log.Printf("received: cmd=%s payload=%s", req.Cmd, req.Payload)
+
+	if err := nativemessaging.WriteMessage(nativeOut, data); err != nil {
+		log.Printf("native messaging write: %v", err)
+		return
+	}
 
 	resp, err := json.Marshal(ipc.Response{Status: "ok"})
 	if err != nil {

@@ -3,10 +3,12 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -211,10 +213,13 @@ func TestHelperDialSocketAsDifferentUID(t *testing.T) {
 }
 
 func TestHandleConnection_ValidRequest_ReturnsOK(t *testing.T) {
-	response, err := invokeHandleConnection(t, mustJSON(t, ipc.Request{
+	nmBuf := withCapturedNativeOut(t)
+	payload := mustJSON(t, ipc.Request{
 		Cmd:     "test",
 		Payload: "hello",
-	}))
+	})
+
+	response, err := invokeHandleConnection(t, payload)
 	if err != nil {
 		t.Fatalf("invoke handleConnection: %v", err)
 	}
@@ -227,6 +232,8 @@ func TestHandleConnection_ValidRequest_ReturnsOK(t *testing.T) {
 	if got.Status != "ok" {
 		t.Fatalf("expected status ok, got %q", got.Status)
 	}
+
+	assertNativeMessage(t, nmBuf.Bytes(), payload)
 }
 
 func TestHandleConnection_InvalidJSON_NoResponse(t *testing.T) {
@@ -259,6 +266,79 @@ func TestHandleConnection_EmptyRequest_NoResponse(t *testing.T) {
 	}
 	if len(response) != 0 {
 		t.Fatalf("expected no response for empty request, got %q", response)
+	}
+}
+
+func TestHandleConnection_MissingCmd_NoForward(t *testing.T) {
+	nmBuf := withCapturedNativeOut(t)
+
+	response, err := invokeHandleConnection(t, mustJSON(t, ipc.Request{
+		Cmd:     "",
+		Payload: "x",
+	}))
+	if err != nil {
+		t.Fatalf("invoke handleConnection: %v", err)
+	}
+	if len(response) != 0 {
+		t.Fatalf("expected no response for missing cmd, got %q", response)
+	}
+	if got := nmBuf.Len(); got != 0 {
+		t.Fatalf("nativeOut length = %d, want 0", got)
+	}
+}
+
+func TestHandleConnection_NoCmdField_NoForward(t *testing.T) {
+	nmBuf := withCapturedNativeOut(t)
+
+	response, err := invokeHandleConnection(t, []byte(`{"payload":"x"}`))
+	if err != nil {
+		t.Fatalf("invoke handleConnection: %v", err)
+	}
+	if len(response) != 0 {
+		t.Fatalf("expected no response for missing cmd field, got %q", response)
+	}
+	if got := nmBuf.Len(); got != 0 {
+		t.Fatalf("nativeOut length = %d, want 0", got)
+	}
+}
+
+func TestHandleConnection_MissingCmd_LogsValidationError(t *testing.T) {
+	withCapturedNativeOut(t)
+	logBuf := withCapturedLogs(t)
+
+	response, err := invokeHandleConnection(t, []byte(`{"payload":"x"}`))
+	if err != nil {
+		t.Fatalf("invoke handleConnection: %v", err)
+	}
+	if len(response) != 0 {
+		t.Fatalf("expected no response for missing cmd field, got %q", response)
+	}
+	if got := logBuf.String(); !strings.Contains(got, "missing required field: cmd") {
+		t.Fatalf("expected validation log, got %q", got)
+	}
+}
+
+func TestHandleConnection_NativeMessagingWriteError_LogsAndNoACK(t *testing.T) {
+	const wantCause = "native pipe down"
+
+	logBuf := withCapturedLogs(t)
+	nativeOut = errorWriter{err: errors.New(wantCause)}
+	t.Cleanup(func() {
+		nativeOut = os.Stdout
+	})
+
+	response, err := invokeHandleConnection(t, mustJSON(t, ipc.Request{
+		Cmd:     "ping",
+		Payload: "data",
+	}))
+	if err != nil {
+		t.Fatalf("invoke handleConnection: %v", err)
+	}
+	if len(response) != 0 {
+		t.Fatalf("expected no response when native messaging write fails, got %q", response)
+	}
+	if got := logBuf.String(); !strings.Contains(got, "native messaging write:") || !strings.Contains(got, wantCause) {
+		t.Fatalf("expected native messaging write failure log, got %q", got)
 	}
 }
 
@@ -523,6 +603,39 @@ func assertProcessAlive(pid int) error {
 	return syscall.Kill(pid, 0)
 }
 
+func withCapturedNativeOut(t *testing.T) *bytes.Buffer {
+	t.Helper()
+
+	var buf bytes.Buffer
+	nativeOut = &buf
+	t.Cleanup(func() {
+		nativeOut = os.Stdout
+	})
+
+	return &buf
+}
+
+func withCapturedLogs(t *testing.T) *bytes.Buffer {
+	t.Helper()
+
+	var buf bytes.Buffer
+	prevWriter := log.Writer()
+	prevFlags := log.Flags()
+	prevPrefix := log.Prefix()
+
+	log.SetOutput(&buf)
+	log.SetFlags(0)
+	log.SetPrefix("")
+
+	t.Cleanup(func() {
+		log.SetOutput(prevWriter)
+		log.SetFlags(prevFlags)
+		log.SetPrefix(prevPrefix)
+	})
+
+	return &buf
+}
+
 func invokeHandleConnection(t *testing.T, payload []byte) ([]byte, error) {
 	t.Helper()
 	requireUnixSocketSupport(t)
@@ -678,6 +791,31 @@ func waitForSubstring(t *testing.T, buf *bytes.Buffer, want string) {
 	t.Fatalf("timed out waiting for %q in %q", want, buf.String())
 }
 
+func assertNativeMessage(t *testing.T, got []byte, wantPayload []byte) {
+	t.Helper()
+
+	if len(got) != 4+len(wantPayload) {
+		t.Fatalf("native message length = %d, want %d", len(got), 4+len(wantPayload))
+	}
+
+	r := bytes.NewReader(got)
+	var gotLen uint32
+	if err := binary.Read(r, binary.NativeEndian, &gotLen); err != nil {
+		t.Fatalf("binary.Read length prefix: %v", err)
+	}
+	if gotLen != uint32(len(wantPayload)) {
+		t.Fatalf("length prefix = %d, want %d", gotLen, len(wantPayload))
+	}
+
+	payload, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatalf("io.ReadAll payload: %v", err)
+	}
+	if !bytes.Equal(payload, wantPayload) {
+		t.Fatalf("payload = %q, want %q", payload, wantPayload)
+	}
+}
+
 func isClosedConnRead(err error) bool {
 	if err == nil {
 		return false
@@ -712,4 +850,12 @@ func isTimeout(err error) bool {
 
 	var netErr net.Error
 	return errors.As(err, &netErr) && netErr.Timeout()
+}
+
+type errorWriter struct {
+	err error
+}
+
+func (w errorWriter) Write(_ []byte) (int, error) {
+	return 0, w.err
 }
