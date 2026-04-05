@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -15,6 +16,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"aibbe/internal/ipc"
 )
 
 // TestCleanupSocket_FileNotExists verifies that cleanupSocket returns nil
@@ -72,7 +75,7 @@ func TestCleanupSocket_RemoveError(t *testing.T) {
 
 func TestDaemonStartup_RecreatesStaleSocketAndAcceptsConnections(t *testing.T) {
 	requireUnixSocketSupport(t)
-	cleanupFixedSocketPath(t)
+	socketPath := tempSocketPath(t)
 
 	f, err := os.Create(socketPath)
 	if err != nil {
@@ -80,7 +83,7 @@ func TestDaemonStartup_RecreatesStaleSocketAndAcceptsConnections(t *testing.T) {
 	}
 	f.Close()
 
-	cmd, stderr := startDaemonProcess(t)
+	cmd, stderr := startDaemonProcess(t, socketPath)
 	defer stopDaemonProcess(t, cmd)
 
 	waitForDial(t, socketPath)
@@ -92,9 +95,9 @@ func TestDaemonStartup_RecreatesStaleSocketAndAcceptsConnections(t *testing.T) {
 
 func TestDaemonStartup_NoStaleSocket_StartsCleanly(t *testing.T) {
 	requireUnixSocketSupport(t)
-	cleanupFixedSocketPath(t)
+	socketPath := tempSocketPath(t)
 
-	cmd, stderr := startDaemonProcess(t)
+	cmd, stderr := startDaemonProcess(t, socketPath)
 	defer stopDaemonProcess(t, cmd)
 
 	waitForDial(t, socketPath)
@@ -126,9 +129,9 @@ func TestSocketPermissions_Is0600(t *testing.T) {
 
 func TestSocketOwnership_MatchesDaemonUID(t *testing.T) {
 	requireUnixSocketSupport(t)
-	cleanupFixedSocketPath(t)
+	socketPath := tempSocketPath(t)
 
-	cmd, _ := startDaemonProcess(t)
+	cmd, _ := startDaemonProcess(t, socketPath)
 	defer stopDaemonProcess(t, cmd)
 
 	waitForDial(t, socketPath)
@@ -152,9 +155,9 @@ func TestSocketOwnership_MatchesDaemonUID(t *testing.T) {
 func TestSocketRejectsDifferentUID_EACCES(t *testing.T) {
 	requireUnixSocketSupport(t)
 	uidStart, gidStart := requireCrossUIDProbeSupport(t)
-	cleanupFixedSocketPath(t)
+	socketPath := tempSocketPath(t)
 
-	cmd, _ := startDaemonProcess(t)
+	cmd, _ := startDaemonProcess(t, socketPath)
 	defer stopDaemonProcess(t, cmd)
 
 	waitForDial(t, socketPath)
@@ -172,7 +175,7 @@ func TestSocketRejectsDifferentUID_EACCES(t *testing.T) {
 	probe.Env = append(
 		os.Environ(),
 		"GO_WANT_HELPER_PROCESS=1",
-		"AIBBE_SOCKET_PATH="+socketPath,
+		ipc.SocketPathEnvVar+"="+socketPath,
 	)
 
 	output, err := probe.CombinedOutput()
@@ -207,6 +210,135 @@ func TestHelperDialSocketAsDifferentUID(t *testing.T) {
 	os.Exit(0)
 }
 
+func TestHandleConnection_ValidRequest_ReturnsOK(t *testing.T) {
+	response, err := invokeHandleConnection(t, mustJSON(t, ipc.Request{
+		Cmd:     "test",
+		Payload: "hello",
+	}))
+	if err != nil {
+		t.Fatalf("invoke handleConnection: %v", err)
+	}
+
+	var got ipc.Response
+	if err := json.Unmarshal(response, &got); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+
+	if got.Status != "ok" {
+		t.Fatalf("expected status ok, got %q", got.Status)
+	}
+}
+
+func TestHandleConnection_InvalidJSON_NoResponse(t *testing.T) {
+	response, err := invokeHandleConnection(t, []byte("garbage"))
+	if err != nil {
+		t.Fatalf("invoke handleConnection: %v", err)
+	}
+	if len(response) != 0 {
+		t.Fatalf("expected no response for invalid JSON, got %q", response)
+	}
+}
+
+func TestHandleConnection_OversizedRequest_Rejected(t *testing.T) {
+	response, err := invokeHandleConnection(t, mustJSON(t, ipc.Request{
+		Cmd:     "big",
+		Payload: strings.Repeat("x", ipc.MaxRequestSize),
+	}))
+	if err != nil && !isClosedConnRead(err) {
+		t.Fatalf("invoke handleConnection: %v", err)
+	}
+	if len(response) != 0 {
+		t.Fatalf("expected no response for oversized request, got %q", response)
+	}
+}
+
+func TestHandleConnection_EmptyRequest_NoResponse(t *testing.T) {
+	response, err := invokeHandleConnection(t, nil)
+	if err != nil {
+		t.Fatalf("invoke handleConnection: %v", err)
+	}
+	if len(response) != 0 {
+		t.Fatalf("expected no response for empty request, got %q", response)
+	}
+}
+
+func TestEndToEnd_CLI_To_Daemon_RoundTrip(t *testing.T) {
+	requireUnixSocketSupport(t)
+
+	socketPath := tempSocketPath(t)
+	cmd, stderr := startDaemonProcess(t, socketPath)
+	defer stopDaemonProcess(t, cmd)
+
+	waitForDial(t, socketPath)
+
+	stdout, cliStderr, exitCode, err := runCLIBinaryFromDaemonTests(t, socketPath, "-cmd", "ping", "-payload", "data")
+	if err != nil {
+		t.Fatalf("expected CLI success, got err=%v stderr=%q", err, cliStderr)
+	}
+	if exitCode != 0 {
+		t.Fatalf("expected CLI exit code 0, got %d", exitCode)
+	}
+	if strings.TrimSpace(stdout) != `{"status":"ok"}` {
+		t.Fatalf("expected ACK on stdout, got %q", stdout)
+	}
+
+	waitForSubstring(t, stderr, "received: cmd=ping payload=data")
+}
+
+func TestDaemonProcessesClientsSequentially(t *testing.T) {
+	requireUnixSocketSupport(t)
+
+	socketPath := tempSocketPath(t)
+	cmd, _ := startDaemonProcess(t, socketPath)
+	defer stopDaemonProcess(t, cmd)
+
+	waitForDial(t, socketPath)
+
+	first := dialUnixConn(t, socketPath)
+	defer first.Close()
+
+	second := dialUnixConn(t, socketPath)
+	defer second.Close()
+
+	if _, err := first.Write(mustJSON(t, ipc.Request{Cmd: "first", Payload: "hold"})); err != nil {
+		t.Fatalf("write first request: %v", err)
+	}
+
+	if _, err := second.Write(mustJSON(t, ipc.Request{Cmd: "second", Payload: "queued"})); err != nil {
+		t.Fatalf("write second request: %v", err)
+	}
+	if err := second.CloseWrite(); err != nil {
+		t.Fatalf("close write second: %v", err)
+	}
+
+	_ = second.SetReadDeadline(time.Now().Add(150 * time.Millisecond))
+	_, err := io.ReadAll(second)
+	if !isTimeout(err) {
+		t.Fatalf("expected second client to wait while first request is in-flight, got err=%v", err)
+	}
+	_ = second.SetReadDeadline(time.Time{})
+
+	if err := first.CloseWrite(); err != nil {
+		t.Fatalf("close write first: %v", err)
+	}
+
+	firstResp, err := io.ReadAll(first)
+	if err != nil {
+		t.Fatalf("read first response: %v", err)
+	}
+	if strings.TrimSpace(string(firstResp)) != `{"status":"ok"}` {
+		t.Fatalf("expected first ACK, got %q", firstResp)
+	}
+
+	secondResp, err := io.ReadAll(second)
+	if err != nil {
+		t.Fatalf("read second response: %v", err)
+	}
+	if strings.TrimSpace(string(secondResp)) != `{"status":"ok"}` {
+		t.Fatalf("expected second ACK, got %q", secondResp)
+	}
+}
+
 func buildDaemonBinary(t *testing.T) string {
 	t.Helper()
 
@@ -225,7 +357,7 @@ func buildDaemonBinary(t *testing.T) string {
 	return binary
 }
 
-func startDaemonProcess(t *testing.T) (*exec.Cmd, *bytes.Buffer) {
+func startDaemonProcess(t *testing.T, socketPath string) (*exec.Cmd, *bytes.Buffer) {
 	t.Helper()
 
 	binary := buildDaemonBinary(t)
@@ -236,6 +368,10 @@ func startDaemonProcess(t *testing.T) (*exec.Cmd, *bytes.Buffer) {
 	var stderr bytes.Buffer
 	cmd.Stdout = &bytes.Buffer{}
 	cmd.Stderr = &stderr
+	cmd.Env = append(
+		os.Environ(),
+		ipc.SocketPathEnvVar+"="+socketPath,
+	)
 
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("start daemon: %v", err)
@@ -253,7 +389,6 @@ func stopDaemonProcess(t *testing.T, cmd *exec.Cmd) {
 
 	_ = cmd.Process.Kill()
 	_ = cmd.Wait()
-	cleanupFixedSocketPath(t)
 }
 
 func waitForDial(t *testing.T, path string) {
@@ -269,11 +404,6 @@ func waitForDial(t *testing.T, path string) {
 		time.Sleep(25 * time.Millisecond)
 	}
 	t.Fatalf("timed out waiting for daemon listener at %s", path)
-}
-
-func cleanupFixedSocketPath(t *testing.T) {
-	t.Helper()
-	_ = os.RemoveAll(socketPath)
 }
 
 func requireUnixSocketSupport(t *testing.T) {
@@ -391,4 +521,195 @@ func copyExecutableForCrossUIDProbe(t *testing.T) string {
 
 func assertProcessAlive(pid int) error {
 	return syscall.Kill(pid, 0)
+}
+
+func invokeHandleConnection(t *testing.T, payload []byte) ([]byte, error) {
+	t.Helper()
+	requireUnixSocketSupport(t)
+
+	socketPath := filepath.Join(t.TempDir(), "handle.sock")
+	l, err := net.Listen("unix", socketPath)
+	if err != nil {
+		t.Fatalf("listen unix socket: %v", err)
+	}
+	defer func() {
+		_ = l.Close()
+		_ = os.Remove(socketPath)
+	}()
+
+	accepted := make(chan net.Conn, 1)
+	errCh := make(chan error, 1)
+	go func() {
+		conn, err := l.Accept()
+		if err != nil {
+			errCh <- err
+			return
+		}
+		accepted <- conn
+	}()
+
+	clientConn, err := net.Dial("unix", socketPath)
+	if err != nil {
+		t.Fatalf("dial unix socket: %v", err)
+	}
+	defer clientConn.Close()
+
+	serverConn := waitAcceptedConn(t, accepted, errCh)
+	done := make(chan struct{})
+	go func() {
+		handleConnection(serverConn)
+		close(done)
+	}()
+
+	if len(payload) > 0 {
+		if _, err := clientConn.Write(payload); err != nil {
+			t.Fatalf("write request: %v", err)
+		}
+	}
+
+	unixConn, ok := clientConn.(*net.UnixConn)
+	if !ok {
+		t.Fatalf("expected *net.UnixConn, got %T", clientConn)
+	}
+	if err := unixConn.CloseWrite(); err != nil {
+		t.Fatalf("close write: %v", err)
+	}
+
+	response, err := io.ReadAll(clientConn)
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for handleConnection to finish")
+	}
+
+	return response, err
+}
+
+func waitAcceptedConn(t *testing.T, accepted <-chan net.Conn, errCh <-chan error) net.Conn {
+	t.Helper()
+
+	select {
+	case conn := <-accepted:
+		return conn
+	case err := <-errCh:
+		t.Fatalf("accept error: %v", err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for accepted connection")
+	}
+
+	return nil
+}
+
+func mustJSON(t *testing.T, v any) []byte {
+	t.Helper()
+
+	data, err := json.Marshal(v)
+	if err != nil {
+		t.Fatalf("marshal json: %v", err)
+	}
+
+	return data
+}
+
+func tempSocketPath(t *testing.T) string {
+	t.Helper()
+	return filepath.Join(t.TempDir(), "aibbe.sock")
+}
+
+func buildCLIBinaryFromDaemonTests(t *testing.T) string {
+	t.Helper()
+
+	binary := filepath.Join(t.TempDir(), "aibbe-cli")
+	cmd := exec.Command("go", "build", "-o", binary, "../cmd/cli")
+	cmd.Env = append(
+		os.Environ(),
+		"CGO_ENABLED=0",
+		"GOCACHE=/tmp/go-build",
+		"GOMODCACHE=/tmp/go-mod-cache",
+	)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("build cli binary: %v\n%s", err, output)
+	}
+	return binary
+}
+
+func runCLIBinaryFromDaemonTests(t *testing.T, socketPath string, args ...string) (string, string, int, error) {
+	t.Helper()
+
+	binary := buildCLIBinaryFromDaemonTests(t)
+	cmd := exec.Command(binary, args...)
+	cmd.Env = append(
+		os.Environ(),
+		ipc.SocketPathEnvVar+"="+socketPath,
+	)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	exitCode := 0
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			exitCode = exitErr.ExitCode()
+		} else {
+			exitCode = -1
+		}
+	}
+
+	return stdout.String(), stderr.String(), exitCode, err
+}
+
+func waitForSubstring(t *testing.T, buf *bytes.Buffer, want string) {
+	t.Helper()
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if strings.Contains(buf.String(), want) {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+
+	t.Fatalf("timed out waiting for %q in %q", want, buf.String())
+}
+
+func isClosedConnRead(err error) bool {
+	if err == nil {
+		return false
+	}
+	return errors.Is(err, io.EOF) ||
+		errors.Is(err, net.ErrClosed) ||
+		errors.Is(err, syscall.ECONNRESET) ||
+		strings.Contains(strings.ToLower(err.Error()), "connection reset")
+}
+
+func dialUnixConn(t *testing.T, socketPath string) *net.UnixConn {
+	t.Helper()
+
+	conn, err := net.Dial("unix", socketPath)
+	if err != nil {
+		t.Fatalf("dial unix conn: %v", err)
+	}
+
+	unixConn, ok := conn.(*net.UnixConn)
+	if !ok {
+		_ = conn.Close()
+		t.Fatalf("expected *net.UnixConn, got %T", conn)
+	}
+
+	return unixConn
+}
+
+func isTimeout(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var netErr net.Error
+	return errors.As(err, &netErr) && netErr.Timeout()
 }

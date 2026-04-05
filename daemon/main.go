@@ -1,14 +1,16 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
 	"syscall"
-)
 
-const socketPath = "/tmp/aibbe.sock"
+	"aibbe/internal/ipc"
+)
 
 // cleanupSocket removes the socket file at socketPath if it exists.
 // Returns nil if the file does not exist (os.IsNotExist).
@@ -30,6 +32,8 @@ func listenSecure(network, address string) (net.Listener, error) {
 }
 
 func main() {
+	socketPath := ipc.SocketPathForProcess()
+
 	if err := cleanupSocket(socketPath); err != nil {
 		log.Fatalf("cleanup socket: %v", err)
 	}
@@ -48,6 +52,39 @@ func main() {
 			log.Printf("accept error: %v", err)
 			continue
 		}
-		conn.Close()
+		handleConnection(conn)
+	}
+}
+
+func handleConnection(conn net.Conn) {
+	defer conn.Close()
+
+	data, err := io.ReadAll(io.LimitReader(conn, ipc.MaxRequestSize+1))
+	if err != nil {
+		log.Printf("read error: %v", err)
+		return
+	}
+
+	if len(data) > ipc.MaxRequestSize {
+		log.Printf("request too large: %d bytes", len(data))
+		return
+	}
+
+	var req ipc.Request
+	if err := json.Unmarshal(data, &req); err != nil {
+		log.Printf("invalid JSON: %v", err)
+		return
+	}
+
+	log.Printf("received: cmd=%s payload=%s", req.Cmd, req.Payload)
+
+	resp, err := json.Marshal(ipc.Response{Status: "ok"})
+	if err != nil {
+		log.Printf("marshal response error: %v", err)
+		return
+	}
+
+	if _, err := conn.Write(resp); err != nil {
+		log.Printf("write response error: %v", err)
 	}
 }
