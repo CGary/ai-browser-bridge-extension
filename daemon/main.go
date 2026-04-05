@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"syscall"
 )
 
 const socketPath = "/tmp/aibbe.sock"
@@ -19,18 +20,27 @@ func cleanupSocket(socketPath string) error {
 	return nil
 }
 
+// listenSecure creates a Unix listener with 0600 permissions by applying
+// a restrictive umask during socket creation.
+func listenSecure(network, address string) (net.Listener, error) {
+	prevMask := syscall.Umask(0o177)
+	l, err := net.Listen(network, address)
+	syscall.Umask(prevMask)
+	return l, err
+}
+
 func main() {
 	if err := cleanupSocket(socketPath); err != nil {
 		log.Fatalf("cleanup socket: %v", err)
 	}
 
-	l, err := net.Listen("unix", socketPath)
+	l, err := listenSecure("unix", socketPath)
 	if err != nil {
 		log.Fatalf("listen: %v", err)
 	}
 	defer l.Close()
 
-	log.Printf("daemon listening on %s", socketPath)
+	log.Printf("daemon listening on %s with mode 0600", socketPath)
 
 	for {
 		conn, err := l.Accept()
