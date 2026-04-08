@@ -8,8 +8,8 @@ El sistema implementa una arquitectura híbrida diseñada para orquestar interac
 * **Daemon (Host de Native Messaging):** Binario residente desarrollado en Go. Mantiene el estado de la conexión persistente con el navegador a través de los flujos estándar (`stdin`/`stdout`). Opera como un servidor IPC (Inter-Process Communication) sobre un socket Unix (ej. `/tmp/aibbe.sock`), traduciendo las peticiones síncronas de la CLI en eventos asíncronos para la extensión.
 * **API Native Messaging de Chromium:** Interfaz estándar del navegador que facilita y securiza el intercambio de cargas útiles entre la extensión y el binario anfitrión.
 * **Extensión de Chromium:**
-    * *Background Script / Service Worker:* Escucha los eventos provenientes del daemon, gestiona el enrutamiento bidireccional de los mensajes y controla el ciclo de vida de la inyección de scripts.
-    * *Content Script:* Componente inyectado dinámicamente en el contexto de la pestaña activa. Ejecuta el mapeo de selectores, la inserción de contexto (RAG automatizado) y la extracción del código fuente validado.
+    * *Background Script / Service Worker:* Escucha los eventos provenientes del daemon, gestiona el enrutamiento bidireccional de los mensajes hacia pestañas de NotebookLM y controla el ciclo de vida de la inyección de scripts.
+    * *Content Script:* Componente inyectado dinámicamente en `notebooklm.google.com`. Ejecuta el mapeo de selectores, la inserción de contexto (RAG automatizado) y la extracción del código fuente validado.
 
 ## 3. Modelo de Datos y Almacenamiento
 La arquitectura opera bajo un paradigma de almacenamiento estrictamente volátil. El ciclo de vida de los datos, incluyendo el contexto técnico inyectado, las plantillas de prompts y el código resultante, reside de manera exclusiva en la memoria operativa (RAM) durante la ejecución transaccional del comando. Se omite de forma deliberada la persistencia en el sistema de archivos local y la implementación de APIs de almacenamiento del navegador (ej. `chrome.storage.local`) para garantizar la latencia mínima y satisfacer el alcance del MVP.

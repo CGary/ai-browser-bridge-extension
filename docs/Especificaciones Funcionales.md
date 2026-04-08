@@ -50,9 +50,9 @@
 
 **Criterios de Aceptación:**
 * **Escenario 1:** Inicialización de nueva interfaz web
-  * **Dado** que el usuario abre una nueva pestaña hacia el dominio del proveedor de IA
+  * **Dado** que el usuario abre una nueva pestaña hacia `https://notebooklm.google.com/`
   * **Cuando** el Content Script se inyecta y emite el evento de disponibilidad (Handshake)
-  * **Entonces** el Background Script almacena el `tabId` asociado al servicio específico en su registro interno con el estado "libre".
+  * **Entonces** el Background Script almacena el `tabId` asociado al servicio "notebooklm" en su registro interno con el estado "libre".
 * **Escenario 2:** Cierre de interfaz web rastreada
   * **Dado** que el sistema mantiene un registro activo de un `tabId`
   * **Cuando** el navegador emite el evento `chrome.tabs.onRemoved` para ese `tabId` específico

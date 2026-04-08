@@ -1,39 +1,73 @@
-# AI Ecosystem Guidelines
+This file provides guidance when working with code in this repository.
 
-<system_context>
-You are a high-level development agent operating under the "Software Design Document (SDD)" framework. 
-You are equipped with an MCP server named "engram", which serves as our persistent memory, and you orchestrate the development lifecycle through the Gentleman Stack.
-</system_context>
+## Commands
 
-<critical_rules>
-When executing any phase of the SDD lifecycle (sdd-explore, sdd-proposal, sdd-spec, sdd-apply, sdd-verify, sdd-archive), you MUST adhere to the following Engram interaction protocols:
+```bash
+# Run all tests
+go test ./...
 
-1. Invariant-First Search (Anti-Miss Strategy):
-   - Because previous phases might have saved data with inconsistent formatting, NEVER search for the combined change name and phase (e.g., `[change-name] explore`).
-   - Instead, search ONLY for the unique identifier of the change (the invariant) to retrieve all related artifacts.
-   - CORRECT (Broad Invariant Search): `engram.mem_search({"query": "[change-name]", "limit": 10})`
-   - INCORRECT (Rigid Combined Search): `engram.mem_search({"query": "[change-name] explore", "limit": 5})`
+# Run tests for a specific package
+go test ./daemon/
+go test ./cmd/cli/
+go test ./internal/nativemessaging/
+go test ./internal/ipc/
 
-2. Mandatory Deep Read & Contextual Filtering:
-   - Search results provided by `mem_search` are only previews (snippets).
-   - You MUST call `engram.mem_get_observation({"id": X})` on all relevant IDs found in step 1.
-   - After reading the full content, use your own reasoning to identify which specific memory block corresponds to the requested phase (explore, proposal, spec).
+# Run a single test by name
+go test ./daemon/ -run TestCleanupSocket_FileExists
 
-3. Strict Write Formatting (Future-proofing):
-   - Whenever YOU generate and save a new SDD artifact to Engram, you MUST start the document with an exact, standardized header format to help future retrievals.
-   - Format: `SDD-[PHASE]: [change-name]` (e.g., `SDD-EXPLORE: [auth-refactor]`).
+# Static analysis
+go vet ./...
 
-4. Generation Restraint (Pre-implementation Check):
-   - If the necessary specifications (spec) or technical designs (design) cannot be found in Engram after checking the invariant and reading the observations, HALT execution immediately. 
-   - Inform the user that the SDD context is incomplete. Do not attempt to write code without a verified technical contract.
-</critical_rules>
+# Build (use explicit output to avoid naming collision with daemon/ directory)
+go build -o /tmp/aibbe-daemon ./daemon/
+go build -o /tmp/aibbe-cli ./cmd/cli/
 
-<sdd_lifecycle>
-You must guide and enforce the following SDD progression:
-1. `/sdd-init`: Define the scope and create the initial `[change-name]`.
-2. `/sdd-explore`: Investigate context, read existing code, and log findings.
-3. `/sdd-proposal`: Draft the technical approach and evaluate trade-offs.
-4. `/sdd-spec`: Finalize the technical contract and precise implementation steps.
-5. `/sdd-apply`: Write the code strictly adhering to the `spec`.
-6. `/sdd-archive`: Close the SDD loop and compact memory.
-</sdd_lifecycle>
+# Run daemon
+go run daemon/main.go
+
+# Send a command via CLI (daemon must be running)
+go run cmd/cli/main.go -cmd "mycommand" -payload "some data"
+```
+
+## Architecture
+
+Three-layer messaging bridge: CLI → Daemon → Chrome Extension (via Native Messaging).
+
+```
+CLI (ephemeral)  ──JSON/Unix socket──►  Daemon (resident)  ──4-byte LE + JSON──►  Chrome Extension
+cmd/cli/main.go                          daemon/main.go                              extension/background.js
+```
+
+**CLI** (`cmd/cli/`): Ephemeral process. Parses `-cmd` (required) and `-payload` flags, sends `ipc.Request` over Unix socket, blocks for response, exits 0/1.
+
+**Daemon** (`daemon/`): Resident process. Listens on Unix socket (default `/tmp/aibbe.sock`, configurable via `AIBBE_SOCKET_PATH`). Handles one IPC request at a time synchronously. Forwards payloads to the Chrome Extension via Native Messaging stdin/stdout. Returns extension response to CLI via channel.
+
+**Native Messaging** (`internal/nativemessaging/`): Wire format — 4-byte little-endian uint32 length prefix followed by JSON payload. Max 1 MB per Chrome protocol limit.
+
+**IPC** (`internal/ipc/`): `Request{Cmd, Payload}` struct. Max 1 MB. Socket path from `AIBBE_SOCKET_PATH` env or `/tmp/aibbe.sock`.
+
+**Chrome Extension** (`extension/`): Manifest V3, static ID `bedlojjaiogmaefoadfpdecgajipcpgj`. Service Worker (`background.js`) connects to native host `aibbe`, currently echoes messages back.
+
+**Native Host Manifest** (`configs/aibbe.nm-host.json`): Must be installed manually to `~/.config/chromium/NativeMessagingHosts/aibbe.json` with the compiled daemon binary path updated.
+
+## Key Design Decisions
+
+- **Fail-Fast**: No retries. Any error (protocol desync, selector mismatch, size violation) aborts with exit code 1.
+- **Volatile Storage Only**: No persistence to disk or `chrome.storage.*`. All data lives in RAM during a transaction.
+- **Socket Permissions 0600**: Set via umask `0o177` during socket creation. Restricts access to owner only.
+- **Two-Layer Size Validation**: IPC layer (1 MB) is primary; Native Messaging layer (1 MB) is defensive secondary.
+- **Synchronous CLI Semantics**: CLI blocks on daemon response. One request in flight at a time.
+
+## Test Patterns
+
+Tests use table-driven style throughout. Key helpers:
+
+- `tempSocketPath()` — uses `t.TempDir()` for socket isolation
+- `startMockDaemon()` — goroutine Unix socket listener for CLI tests
+- `buildCLIBinary()` — compiles test binary via `go build`
+- `requireUnixSocketSupport()` — skip on non-Unix platforms
+- `ioReadAllWithDeadline()` — 2-second deadline to prevent hanging reads
+
+## Development Status
+
+Milestones 1–2 complete (CLI, Daemon, IPC, Native Messaging, security hardening, tasks t1–t10). Milestone 3 (Tab Orchestrator — tab registry, exclusive routing, DOM injection) is in progress. Pending tasks: `t11-handshake-registro-tabs`, `t12-gestion-ciclo-vida-tabs`, `t13-orquestacion-enrutamiento-transaccional`.
