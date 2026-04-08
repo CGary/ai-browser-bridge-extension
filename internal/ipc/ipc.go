@@ -14,11 +14,6 @@ type Request struct {
 	Payload string `json:"payload"`
 }
 
-// Response represents a daemon-to-CLI IPC response.
-type Response struct {
-	Status string `json:"status"`
-}
-
 // SocketPathForProcess returns the configured socket path for the current
 // process, defaulting to the production path when no override is set.
 func SocketPathForProcess() string {

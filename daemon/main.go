@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"sync"
 	"syscall"
 
 	"aibbe/internal/ipc"
@@ -16,6 +17,38 @@ import (
 // nativeOut is the writer for Native Messaging output.
 // Production uses os.Stdout; tests override it with a buffer.
 var nativeOut io.Writer = os.Stdout
+
+// stdinReader is the reader for Native Messaging input.
+// Production uses os.Stdin; tests override it with in-memory readers.
+var stdinReader io.Reader = os.Stdin
+
+// exitFunc terminates the process on fatal protocol desynchronization.
+// Tests override it to capture the exit code without terminating the test process.
+var exitFunc = os.Exit
+
+// responseCh is the single in-flight handoff channel between Native Messaging
+// stdin and the active IPC handler.
+var responseCh chan []byte
+
+var responseChCloseOnce sync.Once
+
+const fatalProtocolMessage = "[FATAL] [Daemon] Desincronización de protocolo Native Messaging"
+
+func initResponseChannel() chan []byte {
+	responseCh = make(chan []byte)
+	responseChCloseOnce = sync.Once{}
+	return responseCh
+}
+
+func closeResponseChannel() {
+	if responseCh == nil {
+		return
+	}
+
+	responseChCloseOnce.Do(func() {
+		close(responseCh)
+	})
+}
 
 // cleanupSocket removes the socket file at socketPath if it exists.
 // Returns nil if the file does not exist (os.IsNotExist).
@@ -47,6 +80,8 @@ func run(socketPath string, stop <-chan struct{}) error {
 	}
 	defer l.Close()
 
+	initResponseChannel()
+
 	log.Printf("daemon listening on %s with mode 0600", socketPath)
 
 	stopSignal := make(chan struct{})
@@ -59,6 +94,10 @@ func run(socketPath string, stop <-chan struct{}) error {
 	}()
 	defer close(stopSignal)
 
+	go stdinLoop(stdinReader, func(data []byte) {
+		responseCh <- data
+	})
+
 	for {
 		conn, err := l.Accept()
 		if err != nil {
@@ -70,6 +109,20 @@ func run(socketPath string, stop <-chan struct{}) error {
 			return fmt.Errorf("accept: %w", err)
 		}
 		handleConnection(conn)
+	}
+}
+
+func stdinLoop(r io.Reader, onMessage func([]byte)) {
+	for {
+		payload, err := nativemessaging.ReadMessage(r)
+		if err != nil {
+			closeResponseChannel()
+			_, _ = fmt.Fprintln(os.Stderr, fatalProtocolMessage)
+			exitFunc(1)
+			return
+		}
+
+		onMessage(payload)
 	}
 }
 
@@ -113,9 +166,14 @@ func handleConnection(conn net.Conn) {
 		return
 	}
 
-	resp, err := json.Marshal(ipc.Response{Status: "ok"})
-	if err != nil {
-		log.Printf("marshal response error: %v", err)
+	if responseCh == nil {
+		log.Printf("native messaging response channel not initialized")
+		return
+	}
+
+	resp, ok := <-responseCh
+	if !ok {
+		log.Printf("native messaging transport closed while waiting for response")
 		return
 	}
 

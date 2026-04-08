@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"testing"
 	"time"
@@ -133,6 +134,19 @@ func TestSocketPermissions_Is0600(t *testing.T) {
 func TestRun_StartsAndStops(t *testing.T) {
 	requireUnixSocketSupport(t)
 
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	defer r.Close()
+	defer w.Close()
+
+	prevStdinReader := stdinReader
+	stdinReader = r
+	t.Cleanup(func() {
+		stdinReader = prevStdinReader
+	})
+
 	socketPath := tempSocketPath(t)
 	stop := make(chan struct{})
 	errCh := make(chan error, 1)
@@ -241,25 +255,18 @@ func TestHelperDialSocketAsDifferentUID(t *testing.T) {
 	os.Exit(0)
 }
 
-func TestHandleConnection_ValidRequest_ReturnsOK(t *testing.T) {
-	nmBuf := withCapturedNativeOut(t)
+func TestHandleConnection_ValidRequest_ReturnsRawNativeResponse(t *testing.T) {
 	payload := mustJSON(t, ipc.Request{
 		Cmd:     "test",
 		Payload: "hello",
 	})
 
-	response, err := invokeHandleConnection(t, payload)
+	response, nmBuf, err := invokeHandleConnectionWithNativeResponse(t, payload, payload)
 	if err != nil {
 		t.Fatalf("invoke handleConnection: %v", err)
 	}
-
-	var got ipc.Response
-	if err := json.Unmarshal(response, &got); err != nil {
-		t.Fatalf("unmarshal response: %v", err)
-	}
-
-	if got.Status != "ok" {
-		t.Fatalf("expected status ok, got %q", got.Status)
+	if string(response) != string(payload) {
+		t.Fatalf("response = %q, want %q", response, payload)
 	}
 
 	assertNativeMessage(t, nmBuf.Bytes(), payload)
@@ -356,7 +363,7 @@ func TestHandleConnection_MissingCmd_LogsValidationError(t *testing.T) {
 	}
 }
 
-func TestHandleConnection_NativeMessagingWriteError_LogsAndNoACK(t *testing.T) {
+func TestHandleConnection_NativeMessagingWriteError_LogsAndNoResponse(t *testing.T) {
 	const wantCause = "native pipe down"
 
 	logBuf := withCapturedLogs(t)
@@ -378,6 +385,23 @@ func TestHandleConnection_NativeMessagingWriteError_LogsAndNoACK(t *testing.T) {
 	if got := logBuf.String(); !strings.Contains(got, "native messaging write:") || !strings.Contains(got, wantCause) {
 		t.Fatalf("expected native messaging write failure log, got %q", got)
 	}
+}
+
+func TestHandleConnection_TransportEOF_ClosesWithoutResponse(t *testing.T) {
+	payload := mustJSON(t, ipc.Request{
+		Cmd:     "ping",
+		Payload: "data",
+	})
+
+	response, nmBuf, err := invokeHandleConnectionWithTransportEOF(t, payload)
+	if err != nil && !isClosedConnRead(err) {
+		t.Fatalf("invoke handleConnection: %v", err)
+	}
+	if len(response) != 0 {
+		t.Fatalf("expected no response after transport EOF, got %q", response)
+	}
+
+	assertNativeMessage(t, nmBuf.Bytes(), payload)
 }
 
 func TestNativeMessaging_OversizedPayload_Rejected(t *testing.T) {
@@ -406,10 +430,17 @@ func TestEndToEnd_CLI_To_Daemon_RoundTrip(t *testing.T) {
 	requireUnixSocketSupport(t)
 
 	socketPath := tempSocketPath(t)
-	cmd, stderr := startDaemonProcess(t, socketPath)
+	cmd, stderr, stdin := startDaemonProcessWithStdin(t, socketPath)
 	defer stopDaemonProcess(t, cmd)
+	defer stdin.Close()
 
 	waitForDial(t, socketPath)
+
+	wantResponse := mustJSON(t, ipc.Request{Cmd: "ping", Payload: "data"})
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		_ = nativemessaging.WriteMessage(stdin.(io.Writer), wantResponse)
+	}()
 
 	stdout, cliStderr, exitCode, err := runCLIBinaryFromDaemonTests(t, socketPath, "-cmd", "ping", "-payload", "data")
 	if err != nil {
@@ -418,8 +449,8 @@ func TestEndToEnd_CLI_To_Daemon_RoundTrip(t *testing.T) {
 	if exitCode != 0 {
 		t.Fatalf("expected CLI exit code 0, got %d", exitCode)
 	}
-	if strings.TrimSpace(stdout) != `{"status":"ok"}` {
-		t.Fatalf("expected ACK on stdout, got %q", stdout)
+	if strings.TrimSpace(stdout) != string(wantResponse) {
+		t.Fatalf("expected raw round-trip on stdout, got %q", stdout)
 	}
 
 	waitForSubstring(t, stderr, "received: cmd=ping payload=data")
@@ -429,10 +460,20 @@ func TestDaemonProcessesClientsSequentially(t *testing.T) {
 	requireUnixSocketSupport(t)
 
 	socketPath := tempSocketPath(t)
-	cmd, _ := startDaemonProcess(t, socketPath)
+	cmd, _, stdin := startDaemonProcessWithStdin(t, socketPath)
 	defer stopDaemonProcess(t, cmd)
+	defer stdin.Close()
 
 	waitForDial(t, socketPath)
+
+	firstExpected := mustJSON(t, ipc.Request{Cmd: "first", Payload: "hold"})
+	secondExpected := mustJSON(t, ipc.Request{Cmd: "second", Payload: "queued"})
+	go func() {
+		time.Sleep(100 * time.Millisecond)
+		_ = nativemessaging.WriteMessage(stdin.(io.Writer), firstExpected)
+		time.Sleep(100 * time.Millisecond)
+		_ = nativemessaging.WriteMessage(stdin.(io.Writer), secondExpected)
+	}()
 
 	first := dialUnixConn(t, socketPath)
 	defer first.Close()
@@ -466,16 +507,260 @@ func TestDaemonProcessesClientsSequentially(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read first response: %v", err)
 	}
-	if strings.TrimSpace(string(firstResp)) != `{"status":"ok"}` {
-		t.Fatalf("expected first ACK, got %q", firstResp)
+	if string(firstResp) != string(firstExpected) {
+		t.Fatalf("expected first response %q, got %q", firstExpected, firstResp)
 	}
 
 	secondResp, err := io.ReadAll(second)
 	if err != nil {
 		t.Fatalf("read second response: %v", err)
 	}
-	if strings.TrimSpace(string(secondResp)) != `{"status":"ok"}` {
-		t.Fatalf("expected second ACK, got %q", secondResp)
+	if string(secondResp) != string(secondExpected) {
+		t.Fatalf("expected second response %q, got %q", secondExpected, secondResp)
+	}
+}
+
+func TestStdinLoop_DeliversMessagesBeforeEOF(t *testing.T) {
+	buf, restoreStderr := captureStderr(t)
+	defer restoreStderr()
+	resetResponseChannelForTest(t)
+
+	prevExitFunc := exitFunc
+	exitCodes := make(chan int, 1)
+	exitFunc = func(code int) {
+		exitCodes <- code
+	}
+	t.Cleanup(func() {
+		exitFunc = prevExitFunc
+	})
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	defer r.Close()
+
+	var got [][]byte
+	done := make(chan struct{})
+	go func() {
+		stdinLoop(r, func(payload []byte) {
+			cp := append([]byte(nil), payload...)
+			got = append(got, cp)
+			if len(got) == 2 {
+				close(done)
+			}
+		})
+	}()
+
+	for _, payload := range [][]byte{[]byte(`{"cmd":"one"}`), []byte(`{"cmd":"two"}`)} {
+		if err := nativemessaging.WriteMessage(w, payload); err != nil {
+			t.Fatalf("WriteMessage: %v", err)
+		}
+	}
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for stdinLoop callbacks")
+	}
+
+	if err := w.Close(); err != nil {
+		t.Fatalf("close writer: %v", err)
+	}
+
+	select {
+	case code := <-exitCodes:
+		if code != 1 {
+			t.Fatalf("exit code = %d, want 1", code)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for fatal exit after EOF")
+	}
+
+	restoreStderr()
+
+	select {
+	case _, ok := <-responseCh:
+		if ok {
+			t.Fatal("expected response channel to be closed after EOF")
+		}
+	default:
+		t.Fatal("expected closed response channel to be immediately readable")
+	}
+
+	if gotLen := len(got); gotLen != 2 {
+		t.Fatalf("onMessage calls = %d, want 2", gotLen)
+	}
+	if string(got[0]) != `{"cmd":"one"}` || string(got[1]) != `{"cmd":"two"}` {
+		t.Fatalf("messages = %q, want [%q %q]", got, `{"cmd":"one"}`, `{"cmd":"two"}`)
+	}
+	if gotMsg := strings.TrimSpace(buf.String()); gotMsg != fatalProtocolMessage {
+		t.Fatalf("stderr = %q, want %q", gotMsg, fatalProtocolMessage)
+	}
+}
+
+func TestStdinLoop_FailFastWritesExactMessageAndExitCode(t *testing.T) {
+	buf, restoreStderr := captureStderr(t)
+	defer restoreStderr()
+	resetResponseChannelForTest(t)
+
+	prevExitFunc := exitFunc
+	var gotCode int
+	exitFunc = func(code int) {
+		gotCode = code
+	}
+	t.Cleanup(func() {
+		exitFunc = prevExitFunc
+	})
+
+	stdinLoop(bytes.NewReader([]byte{0x01, 0x00}), func([]byte) {})
+	restoreStderr()
+
+	if gotCode != 1 {
+		t.Fatalf("exit code = %d, want 1", gotCode)
+	}
+	if gotMsg := strings.TrimSpace(buf.String()); gotMsg != fatalProtocolMessage {
+		t.Fatalf("stderr = %q, want %q", gotMsg, fatalProtocolMessage)
+	}
+}
+
+func TestStdinLoop_FailFastOnPartialPayload(t *testing.T) {
+	buf, restoreStderr := captureStderr(t)
+	defer restoreStderr()
+	resetResponseChannelForTest(t)
+
+	prevExitFunc := exitFunc
+	var gotCode int
+	exitFunc = func(code int) {
+		gotCode = code
+	}
+	t.Cleanup(func() {
+		exitFunc = prevExitFunc
+	})
+
+	var input bytes.Buffer
+	if err := binary.Write(&input, binary.LittleEndian, uint32(5)); err != nil {
+		t.Fatalf("binary.Write length prefix: %v", err)
+	}
+	if _, err := input.WriteString("hi"); err != nil {
+		t.Fatalf("write payload: %v", err)
+	}
+
+	stdinLoop(bytes.NewReader(input.Bytes()), func([]byte) {})
+	restoreStderr()
+
+	if gotCode != 1 {
+		t.Fatalf("exit code = %d, want 1", gotCode)
+	}
+	if gotMsg := strings.TrimSpace(buf.String()); gotMsg != fatalProtocolMessage {
+		t.Fatalf("stderr = %q, want %q", gotMsg, fatalProtocolMessage)
+	}
+}
+
+func TestDaemonExitsCode1WhenStdinClosed(t *testing.T) {
+	requireUnixSocketSupport(t)
+
+	socketPath := tempSocketPath(t)
+	cmd, stderr, stdin := startDaemonProcessWithStdin(t, socketPath)
+	defer stopDaemonProcess(t, cmd)
+
+	waitForDial(t, socketPath)
+
+	if err := stdin.Close(); err != nil {
+		t.Fatalf("close stdin: %v", err)
+	}
+
+	err := cmd.Wait()
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("expected exit error after stdin close, got %v", err)
+	}
+	if exitErr.ExitCode() != 1 {
+		t.Fatalf("exit code = %d, want 1; stderr=%s", exitErr.ExitCode(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), fatalProtocolMessage) {
+		t.Fatalf("stderr = %q, want contains %q", stderr.String(), fatalProtocolMessage)
+	}
+}
+
+func TestDaemonExitsCode1WhenPayloadIsTruncated(t *testing.T) {
+	requireUnixSocketSupport(t)
+
+	socketPath := tempSocketPath(t)
+	cmd, stderr, stdin := startDaemonProcessWithStdin(t, socketPath)
+	defer stopDaemonProcess(t, cmd)
+
+	waitForDial(t, socketPath)
+
+	var input bytes.Buffer
+	if err := binary.Write(&input, binary.LittleEndian, uint32(5)); err != nil {
+		t.Fatalf("binary.Write length prefix: %v", err)
+	}
+	if _, err := input.WriteString("hi"); err != nil {
+		t.Fatalf("write payload: %v", err)
+	}
+	if _, err := io.Copy(stdin.(io.Writer), &input); err != nil {
+		t.Fatalf("write stdin: %v", err)
+	}
+	if err := stdin.Close(); err != nil {
+		t.Fatalf("close stdin: %v", err)
+	}
+
+	err := cmd.Wait()
+	var exitErr *exec.ExitError
+	if !errors.As(err, &exitErr) {
+		t.Fatalf("expected exit error after truncated payload, got %v", err)
+	}
+	if exitErr.ExitCode() != 1 {
+		t.Fatalf("exit code = %d, want 1; stderr=%s", exitErr.ExitCode(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), fatalProtocolMessage) {
+		t.Fatalf("stderr = %q, want contains %q", stderr.String(), fatalProtocolMessage)
+	}
+}
+
+func TestDaemonIPCRemainsLiveWhileStdinBlocked(t *testing.T) {
+	requireUnixSocketSupport(t)
+
+	socketPath := tempSocketPath(t)
+	cmd, stderr, stdin := startDaemonProcessWithStdin(t, socketPath)
+	defer stopDaemonProcess(t, cmd)
+	defer stdin.Close()
+
+	waitForDial(t, socketPath)
+
+	type cliResult struct {
+		stdout   string
+		stderr   string
+		exitCode int
+		err      error
+	}
+	resultCh := make(chan cliResult, 1)
+	go func() {
+		stdout, cliStderr, exitCode, err := runCLIBinaryFromDaemonTests(t, socketPath, "-cmd", "ping", "-payload", "data")
+		resultCh <- cliResult{stdout: stdout, stderr: cliStderr, exitCode: exitCode, err: err}
+	}()
+
+	select {
+	case result := <-resultCh:
+		t.Fatalf("expected CLI to remain blocked before NM response, got stdout=%q stderr=%q err=%v", result.stdout, result.stderr, result.err)
+	case <-time.After(150 * time.Millisecond):
+	}
+
+	wantResponse := mustJSON(t, ipc.Request{Cmd: "ping", Payload: "data"})
+	if err := nativemessaging.WriteMessage(stdin.(io.Writer), wantResponse); err != nil {
+		t.Fatalf("write daemon stdin response: %v", err)
+	}
+
+	result := <-resultCh
+	if result.err != nil {
+		t.Fatalf("expected CLI success, got err=%v stderr=%q daemon-stderr=%q", result.err, result.stderr, stderr.String())
+	}
+	if result.exitCode != 0 {
+		t.Fatalf("expected CLI exit code 0, got %d stderr=%q daemon-stderr=%q", result.exitCode, result.stderr, stderr.String())
+	}
+	if strings.TrimSpace(result.stdout) != string(wantResponse) {
+		t.Fatalf("expected raw round-trip on stdout, got %q", result.stdout)
 	}
 }
 
@@ -500,6 +785,16 @@ func buildDaemonBinary(t *testing.T) string {
 func startDaemonProcess(t *testing.T, socketPath string) (*exec.Cmd, *bytes.Buffer) {
 	t.Helper()
 
+	cmd, stderr, stdin := startDaemonProcessWithStdin(t, socketPath)
+	t.Cleanup(func() {
+		_ = stdin.Close()
+	})
+	return cmd, stderr
+}
+
+func startDaemonProcessWithStdin(t *testing.T, socketPath string) (*exec.Cmd, *bytes.Buffer, io.Closer) {
+	t.Helper()
+
 	binary := buildDaemonBinary(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	t.Cleanup(cancel)
@@ -508,16 +803,24 @@ func startDaemonProcess(t *testing.T, socketPath string) (*exec.Cmd, *bytes.Buff
 	var stderr bytes.Buffer
 	cmd.Stdout = &bytes.Buffer{}
 	cmd.Stderr = &stderr
+	stdinR, stdinW, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	cmd.Stdin = stdinR
 	cmd.Env = append(
 		os.Environ(),
 		ipc.SocketPathEnvVar+"="+socketPath,
 	)
 
 	if err := cmd.Start(); err != nil {
+		_ = stdinR.Close()
+		_ = stdinW.Close()
 		t.Fatalf("start daemon: %v", err)
 	}
+	_ = stdinR.Close()
 
-	return cmd, &stderr
+	return cmd, &stderr, stdinW
 }
 
 func stopDaemonProcess(t *testing.T, cmd *exec.Cmd) {
@@ -696,6 +999,38 @@ func withCapturedLogs(t *testing.T) *bytes.Buffer {
 	return &buf
 }
 
+func captureStderr(t *testing.T) (*bytes.Buffer, func()) {
+	t.Helper()
+
+	prev := os.Stderr
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+
+	os.Stderr = w
+
+	var buf bytes.Buffer
+	done := make(chan struct{})
+	go func() {
+		_, _ = io.Copy(&buf, r)
+		close(done)
+	}()
+
+	var once sync.Once
+	restore := func() {
+		once.Do(func() {
+			_ = w.Close()
+			os.Stderr = prev
+			<-done
+			_ = r.Close()
+		})
+	}
+
+	t.Cleanup(restore)
+	return &buf, restore
+}
+
 func invokeHandleConnection(t *testing.T, payload []byte) ([]byte, error) {
 	t.Helper()
 	requireUnixSocketSupport(t)
@@ -851,6 +1186,112 @@ func waitForSubstring(t *testing.T, buf *bytes.Buffer, want string) {
 	t.Fatalf("timed out waiting for %q in %q", want, buf.String())
 }
 
+func resetResponseChannelForTest(t *testing.T) chan []byte {
+	t.Helper()
+
+	ch := initResponseChannel()
+	t.Cleanup(func() {
+		responseCh = nil
+		responseChCloseOnce = sync.Once{}
+	})
+
+	return ch
+}
+
+func invokeHandleConnectionWithNativeResponse(t *testing.T, requestPayload, responsePayload []byte) ([]byte, *bytes.Buffer, error) {
+	t.Helper()
+	requireUnixSocketSupport(t)
+
+	nmBuf := withCapturedNativeOut(t)
+	resetResponseChannelForTest(t)
+	_, restoreStderr := captureStderr(t)
+	defer restoreStderr()
+
+	prevExitFunc := exitFunc
+	exitFunc = func(int) {}
+	t.Cleanup(func() {
+		exitFunc = prevExitFunc
+	})
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	defer r.Close()
+
+	loopDone := make(chan struct{})
+	go func() {
+		stdinLoop(r, func(payload []byte) {
+			responseCh <- append([]byte(nil), payload...)
+		})
+		close(loopDone)
+	}()
+
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		_ = nativemessaging.WriteMessage(w, responsePayload)
+	}()
+
+	response, invokeErr := invokeHandleConnection(t, requestPayload)
+
+	if err := w.Close(); err != nil {
+		t.Fatalf("close writer: %v", err)
+	}
+
+	select {
+	case <-loopDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for stdinLoop to stop")
+	}
+
+	return response, nmBuf, invokeErr
+}
+
+func invokeHandleConnectionWithTransportEOF(t *testing.T, requestPayload []byte) ([]byte, *bytes.Buffer, error) {
+	t.Helper()
+	requireUnixSocketSupport(t)
+
+	nmBuf := withCapturedNativeOut(t)
+	resetResponseChannelForTest(t)
+	_, restoreStderr := captureStderr(t)
+	defer restoreStderr()
+
+	prevExitFunc := exitFunc
+	exitFunc = func(int) {}
+	t.Cleanup(func() {
+		exitFunc = prevExitFunc
+	})
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	defer r.Close()
+
+	loopDone := make(chan struct{})
+	go func() {
+		stdinLoop(r, func(payload []byte) {
+			responseCh <- append([]byte(nil), payload...)
+		})
+		close(loopDone)
+	}()
+
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		_ = w.Close()
+	}()
+
+	response, invokeErr := invokeHandleConnection(t, requestPayload)
+
+	select {
+	case <-loopDone:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for stdinLoop to stop after EOF")
+	}
+
+	return response, nmBuf, invokeErr
+}
+
 func assertNativeMessage(t *testing.T, got []byte, wantPayload []byte) {
 	t.Helper()
 
@@ -860,7 +1301,7 @@ func assertNativeMessage(t *testing.T, got []byte, wantPayload []byte) {
 
 	r := bytes.NewReader(got)
 	var gotLen uint32
-	if err := binary.Read(r, binary.NativeEndian, &gotLen); err != nil {
+	if err := binary.Read(r, binary.LittleEndian, &gotLen); err != nil {
 		t.Fatalf("binary.Read length prefix: %v", err)
 	}
 	if gotLen != uint32(len(wantPayload)) {

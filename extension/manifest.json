@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "AI Browser Bridge Extension",
+  "version": "0.1.0",
+  "description": "Bridge between AI automation daemon and browser DOM",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAk2IOA6mjAwOvPzc76F6l5GxZrHxlchKv5dnxABfcydBITq6DNqsioF+xv73myVWyp5AaWdyjNxSDaGGo8fxs52wAK5/EXT70ugYEvJmnNAQrFrtxV0bakn/mzr/SSX2dbnari++N+pKeX5vh7UO+CGdDZCt5ttTRJ0+PimhwRcbtfaNq6WllAMwNmQKX1MkjITVPbNLcofdEUZ+QzfhzF9YjN6pOHYutVkE/PBqR52onyEgws9XUBb0BPhACqeov2o/W1TMZSyEYPU5UHWCbJmwIZNuki70b8yMWP2js1KQw9SY0WKMCq4hEDe4DCvLO48ONEUNfEPoK3HSxRmiO3QIDAQAB",
+  "permissions": [
+    "nativeMessaging"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
+}
