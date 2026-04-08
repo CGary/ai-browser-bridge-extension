@@ -1,5 +1,11 @@
 This file provides guidance when working with code in this repository.
 
+## Engram Project Name
+
+**Project Name**: `aibbe`
+
+Todos los agentes deben usar `project: aibbe` al guardar/encontrar memorias en Engram. No usar el nombre del directorio `ai-browser-bridge-extension`.
+
 ## Commands
 
 ```bash
