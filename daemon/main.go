@@ -94,7 +94,7 @@ func run(socketPath string, stop <-chan struct{}) error {
 	}()
 	defer close(stopSignal)
 
-	go stdinLoop(stdinReader, func(data []byte) {
+	go stdinLoopUntilStop(stdinReader, stop, func(data []byte) {
 		responseCh <- data
 	})
 
@@ -113,10 +113,21 @@ func run(socketPath string, stop <-chan struct{}) error {
 }
 
 func stdinLoop(r io.Reader, onMessage func([]byte)) {
+	stdinLoopUntilStop(r, nil, onMessage)
+}
+
+func stdinLoopUntilStop(r io.Reader, stop <-chan struct{}, onMessage func([]byte)) {
 	for {
 		payload, err := nativemessaging.ReadMessage(r)
 		if err != nil {
 			closeResponseChannel()
+			if stop != nil {
+				select {
+				case <-stop:
+					return
+				default:
+				}
+			}
 			_, _ = fmt.Fprintln(os.Stderr, fatalProtocolMessage)
 			exitFunc(1)
 			return

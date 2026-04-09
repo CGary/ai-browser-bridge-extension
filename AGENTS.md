@@ -77,3 +77,31 @@ Tests use table-driven style throughout. Key helpers:
 ## Development Status
 
 Milestones 1–2 complete (CLI, Daemon, IPC, Native Messaging, security hardening, tasks t1–t10). Milestone 3 (Tab Orchestrator — tab registry, exclusive routing, DOM injection) is in progress. Pending tasks: `t11-handshake-registro-tabs`, `t12-gestion-ciclo-vida-tabs`, `t13-orquestacion-enrutamiento-transaccional`.
+
+## 🔍 Memory Retrieval Gap Protocol (Engram)
+
+**Mandatory Compliance:** This protocol MUST be triggered whenever you query Engram (via `search_entries`, `get_entry_by_id`, etc.) and the result is empty, irrelevant, or requires the user to manually provide an ID or information.
+
+### 📂 Log Location
+Record these gaps in: `.atl/observability/memory-faults/fault-log-[YYYY-MM-DD].md`
+*Note: Create the directory if it does not exist.*
+
+### 📝 Mandatory Retrieval Gap Format
+Every time you fail to find information and the user has to intervene, log it as follows:
+
+---
+#### ⚠️ Engram Data Gap
+- **Agent:** [e.g., Claude Code, Cursor, OpenCode]
+- **Invoked Tool:** [e.g., search_entries, get_entry_by_id, list_namespaces]
+- **Query Parameter:** `[The exact string you used to search]`
+- **Namespace:** `[The namespace targeted]`
+- **Operational Context:** [e.g., Running /sdd-explore for the authentication module]
+- **Failure Reason:** [e.g., No results found, High vector distance/low relevance, Missing entity ID]
+- **Manual Resolution:** [The exact ID or information provided by the user to fix the gap]
+- **Correction Status:** [PENDING | REPAIRED via engram_push]
+---
+
+### 🚀 Resolution Flow
+1. **Log the Gap:** Immediately write the entry above once the user provides the missing data.
+2. **Sync Memory:** Use `engram_push` or `upsert` to store the manually provided data so this gap never occurs again.
+3. **Update Status:** Change 'Self-Correction' from PENDING to **REPAIRED**.

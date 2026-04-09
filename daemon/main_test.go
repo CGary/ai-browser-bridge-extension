@@ -657,6 +657,65 @@ func TestStdinLoop_FailFastOnPartialPayload(t *testing.T) {
 	}
 }
 
+func TestStdinLoopUntilStop_DoesNotFailFastAfterShutdown(t *testing.T) {
+	buf, restoreStderr := captureStderr(t)
+	defer restoreStderr()
+	resetResponseChannelForTest(t)
+
+	prevExitFunc := exitFunc
+	exitCalled := make(chan int, 1)
+	exitFunc = func(code int) {
+		exitCalled <- code
+	}
+	t.Cleanup(func() {
+		exitFunc = prevExitFunc
+	})
+
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	defer r.Close()
+
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		stdinLoopUntilStop(r, stop, func([]byte) {})
+		close(done)
+	}()
+
+	close(stop)
+
+	if err := w.Close(); err != nil {
+		t.Fatalf("close writer: %v", err)
+	}
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for stop-aware stdinLoop to exit")
+	}
+
+	select {
+	case code := <-exitCalled:
+		t.Fatalf("unexpected exit after stop: %d", code)
+	default:
+	}
+
+	if gotMsg := strings.TrimSpace(buf.String()); gotMsg != "" {
+		t.Fatalf("stderr = %q, want empty", gotMsg)
+	}
+
+	select {
+	case _, ok := <-responseCh:
+		if ok {
+			t.Fatal("expected response channel to be closed after shutdown")
+		}
+	default:
+		t.Fatal("expected closed response channel to be immediately readable")
+	}
+}
+
 func TestDaemonExitsCode1WhenStdinClosed(t *testing.T) {
 	requireUnixSocketSupport(t)
 
