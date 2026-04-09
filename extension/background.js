@@ -16,9 +16,32 @@ function connectToNativeHost() {
     return null;
   }
 
-  port.onMessage.addListener((message) => {
+  port.onMessage.addListener(async (message) => {
     console.log(`${LOG_PREFIX} Message from native host:`, JSON.stringify(message));
-    port.postMessage(message);
+
+    const freeTab = findFreeTab();
+
+    if (!freeTab) {
+      port.postMessage({ status: "error", error: "no_free_tabs" });
+      return;
+    }
+
+    const { tabId, entry } = freeTab;
+    entry.state = "busy";
+
+    try {
+      const response = await chrome.tabs.sendMessage(tabId, {
+        cmd: message.cmd,
+        payload: message.payload,
+      });
+      port.postMessage(response);
+    } catch (err) {
+      port.postMessage({ status: "error", error: err.message });
+    } finally {
+      if (tabRegistry.has(tabId)) {
+        tabRegistry.get(tabId).state = "free";
+      }
+    }
   });
 
   port.onDisconnect.addListener(() => {
@@ -61,5 +84,12 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   tabRegistry.delete(tabId);
   console.log(`${LOG_PREFIX} Tab ${tabId} purged from registry`);
 });
+
+function findFreeTab() {
+  for (const [tabId, entry] of tabRegistry) {
+    if (entry.state === "free") return { tabId, entry };
+  }
+  return null;
+}
 
 connectToNativeHost();

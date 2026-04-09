@@ -5,7 +5,7 @@ Tono: Técnico, analítico, formal, directo e inequívoco.
 
 <task_framework>
 <context>Se provee la documentación completa del proyecto "aibbe" en la carpeta docs y las tareas ya realizadas hasta el momento en la carpeta tasks.</context>
-<objective>Desglosar algorítmicamente el "Hito 3 (M3): Orquestador de Pestañas" en un conjunto exhaustivo de tareas de desarrollo atómicas y verificables.</objective>
+<objective>Desglosar algorítmicamente el "Hito 4 (M4): Motor de Inyección y Extracción (RAG Local)" en un conjunto exhaustivo de tareas de desarrollo atómicas y verificables.</objective>
 <style>Redacción técnica estandarizada, enfocada en la implementación de software.</style>
 <tone>Directivo y preciso.</tone>
 <audience>Ingenieros de software responsables de la ejecución e integración del hito.</audience>
@@ -16,7 +16,7 @@ Tono: Técnico, analítico, formal, directo e inequívoco.
 <rule>Generar tareas que representen un incremento funcional vertical, integrando las capas técnicas necesarias para garantizar la operatividad y testeabilidad desde la primera iteración.</rule>
 <rule>Asegurar la atomicidad: diseñar la tarea para resolver un único problema lógico.</rule>
 <rule>Garantizar la independencia: establecer contratos de interfaz previos para resolver puntos de contacto y evitar bloqueos por el estado interno de otras tareas.</rule>
-<rule>Dimensionar el alcance: la complejidad de la tarea debe permitir su resolución en un ciclo estricto de 1 a 3 días de desarrollo.</rule>
+<rule>Dimensionar el alcance: la complejidad de la tarea debe permitir su resolución en un ciclo estricto de 2 a 4 días de desarrollo.</rule>
 <rule>Establecer verificabilidad: redactar criterios objetivos que permitan determinar el éxito funcional de la tarea sin ambigüedad.</rule>
 <rule>Crear un archivo Markdown individual para cada tarea en la carpeta tasks, siguiendo el formato y las anteriores tareas.</rule>
 </operational_rules>
