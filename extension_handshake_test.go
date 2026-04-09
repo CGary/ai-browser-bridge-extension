@@ -24,10 +24,12 @@ type nodeResult struct {
 	Logs                      []string         `json:"logs"`
 	Sent                      []map[string]any `json:"sent"`
 	MapSets                   []nodeMapSet     `json:"mapSets"`
+	MapDeletes                []int            `json:"mapDeletes"`
 	NativePostMessages        []map[string]any `json:"nativePostMessages"`
 	ConnectNativeHost         string           `json:"connectNativeHost"`
 	HandshakeListenerExists   bool             `json:"handshakeListenerExists"`
 	NativeMessageListenerSeen bool             `json:"nativeMessageListenerSeen"`
+	TabRemovedListenerExists  bool             `json:"tabRemovedListenerExists"`
 }
 
 type nodeMapSet struct {
@@ -219,6 +221,11 @@ global.chrome = {
     },
     lastError: undefined,
   },
+  tabs: {
+    onRemoved: {
+      addListener() {},
+    },
+  },
 };
 
 require(path.resolve(process.cwd(), "extension/background.js"));
@@ -315,6 +322,11 @@ global.chrome = {
     },
     lastError: undefined,
   },
+  tabs: {
+    onRemoved: {
+      addListener() {},
+    },
+  },
 };
 
 require(path.resolve(process.cwd(), "extension/background.js"));
@@ -342,6 +354,160 @@ process.stdout.write(JSON.stringify({
 	okValue, ok := result.NativePostMessages[0]["ok"].(bool)
 	if !ok || !okValue {
 		t.Fatalf("echoed ok flag = %v, want true", result.NativePostMessages[0]["ok"])
+	}
+}
+
+func TestExtensionBackground_PurgesClosedTabsReactively(t *testing.T) {
+	tests := []struct {
+		name            string
+		setup           string
+		invocation      string
+		wantDeletes     []int
+		wantLog         string
+		wantAbsentLog   string
+		wantRemovedHook bool
+	}{
+		{
+			name: "purges registered tab on closure",
+			setup: `
+listener({ type: "HANDSHAKE", service: "notebooklm" }, { tab: { id: 123 } });
+`,
+			invocation:      `removedListener(123, { isWindowClosing: false, windowId: 1 });`,
+			wantDeletes:     []int{123},
+			wantLog:         "[aibbe] Tab 123 purged from registry",
+			wantRemovedHook: true,
+		},
+		{
+			name: "ignores non registered tab closure",
+			setup: `
+listener({ type: "HANDSHAKE", service: "notebooklm" }, { tab: { id: 123 } });
+`,
+			invocation:      `removedListener(456, { isWindowClosing: false, windowId: 1 });`,
+			wantDeletes:     nil,
+			wantAbsentLog:   "purged from registry",
+			wantRemovedHook: true,
+		},
+		{
+			name: "purges tab even when window is closing",
+			setup: `
+listener({ type: "HANDSHAKE", service: "notebooklm" }, { tab: { id: 789 } });
+`,
+			invocation:      `removedListener(789, { isWindowClosing: true, windowId: 7 });`,
+			wantDeletes:     []int{789},
+			wantLog:         "[aibbe] Tab 789 purged from registry",
+			wantRemovedHook: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var result nodeResult
+			runNodeJSON(t, `
+const path = require("path");
+const logs = [];
+const mapSets = [];
+const mapDeletes = [];
+let listener = null;
+let removedListener = null;
+let nativeMessageListener = null;
+const NativeMap = global.Map;
+
+global.Map = class ObservedMap extends NativeMap {
+  set(key, value) {
+    mapSets.push({ key, value });
+    return super.set(key, value);
+  }
+
+  delete(key) {
+    mapDeletes.push(key);
+    return super.delete(key);
+  }
+};
+
+const port = {
+  onMessage: {
+    addListener(fn) {
+      nativeMessageListener = fn;
+    },
+  },
+  onDisconnect: {
+    addListener() {},
+  },
+  postMessage() {},
+};
+
+global.console = {
+  log: (...args) => logs.push(args.map((arg) => typeof arg === "string" ? arg : JSON.stringify(arg)).join(" ")),
+  warn: () => {},
+  error: () => {},
+};
+
+global.chrome = {
+  runtime: {
+    connectNative: () => port,
+    onMessage: {
+      addListener(fn) {
+        listener = fn;
+      },
+    },
+    lastError: undefined,
+  },
+  tabs: {
+    onRemoved: {
+      addListener(fn) {
+        removedListener = fn;
+      },
+    },
+  },
+};
+
+require(path.resolve(process.cwd(), "extension/background.js"));
+`+tt.setup+`
+`+tt.invocation+`
+process.stdout.write(JSON.stringify({
+  logs,
+  mapSets,
+  mapDeletes,
+  handshakeListenerExists: typeof listener === "function",
+  nativeMessageListenerSeen: typeof nativeMessageListener === "function",
+  tabRemovedListenerExists: typeof removedListener === "function",
+}));
+`, &result)
+
+			if !result.HandshakeListenerExists {
+				t.Fatal("background.js did not register a runtime onMessage listener")
+			}
+
+			if !result.NativeMessageListenerSeen {
+				t.Fatal("background.js did not register the native port onMessage listener")
+			}
+
+			if result.TabRemovedListenerExists != tt.wantRemovedHook {
+				t.Fatalf("tab removed listener exists = %v, want %v", result.TabRemovedListenerExists, tt.wantRemovedHook)
+			}
+
+			if len(result.MapDeletes) != len(tt.wantDeletes) {
+				t.Fatalf("tab purges = %d, want %d", len(result.MapDeletes), len(tt.wantDeletes))
+			}
+
+			for i, wantDelete := range tt.wantDeletes {
+				if got := result.MapDeletes[i]; got != wantDelete {
+					t.Fatalf("purged tab id[%d] = %d, want %d", i, got, wantDelete)
+				}
+			}
+
+			if tt.wantAbsentLog != "" && containsLog(result.Logs, tt.wantAbsentLog) {
+				t.Fatalf("expected logs not to include %q, got %v", tt.wantAbsentLog, result.Logs)
+			}
+
+			if tt.wantLog == "" {
+				return
+			}
+
+			if !containsLog(result.Logs, tt.wantLog) {
+				t.Fatalf("expected logs to include %q, got %v", tt.wantLog, result.Logs)
+			}
+		})
 	}
 }
 

@@ -53,4 +53,13 @@ chrome.runtime.onMessage.addListener((message, sender) => {
   console.log(`${LOG_PREFIX} Tab ${sender.tab.id} registered for ${message.service}`);
 });
 
+chrome.tabs.onRemoved.addListener((tabId) => {
+  if (!tabRegistry.has(tabId)) {
+    return;
+  }
+
+  tabRegistry.delete(tabId);
+  console.log(`${LOG_PREFIX} Tab ${tabId} purged from registry`);
+});
+
 connectToNativeHost();
