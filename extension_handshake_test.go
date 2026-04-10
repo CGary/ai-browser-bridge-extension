@@ -27,6 +27,10 @@ type nodeResult struct {
 	MapDeletes                []int            `json:"mapDeletes"`
 	NativePostMessages        []map[string]any `json:"nativePostMessages"`
 	ContentResponses          []map[string]any `json:"contentResponses"`
+	InputValue                string           `json:"inputValue"`
+	InputEvents               int              `json:"inputEvents"`
+	ButtonClicks              int              `json:"buttonClicks"`
+	QuerySelectorCalls        []string         `json:"querySelectorCalls"`
 	ConnectNativeHost         string           `json:"connectNativeHost"`
 	HandshakeListenerExists   bool             `json:"handshakeListenerExists"`
 	NativeMessageListenerSeen bool             `json:"nativeMessageListenerSeen"`
@@ -150,13 +154,73 @@ process.stdout.write(JSON.stringify({ logs, sent }));
 }
 
 func TestExtensionContent_ProcessesGenerateCommand(t *testing.T) {
-	var result nodeResult
-	runNodeJSON(t, `
+	t.Run("injects payload and clicks submit without closing async channel on success", func(t *testing.T) {
+		var result nodeResult
+		runNodeJSON(t, `
 const path = require("path");
 const logs = [];
 const sent = [];
 const contentResponses = [];
+const querySelectorCalls = [];
 let onMessageListener = null;
+let inputEvents = 0;
+let buttonClicks = 0;
+
+class FakeTextArea {
+  constructor() {
+    this._value = "";
+  }
+
+  dispatchEvent(event) {
+    if (event.type === "input" && event.bubbles === true) {
+      inputEvents += 1;
+    }
+    return true;
+  }
+}
+
+Object.defineProperty(FakeTextArea.prototype, "value", {
+  get() {
+    return this._value;
+  },
+  set(next) {
+    this._value = next;
+  },
+});
+
+const input = new FakeTextArea();
+const submitButton = {
+  click() {
+    buttonClicks += 1;
+  },
+};
+
+global.Event = class FakeEvent {
+  constructor(type, options = {}) {
+    this.type = type;
+    this.bubbles = options.bubbles === true;
+  }
+};
+
+global.window = {
+  HTMLTextAreaElement: FakeTextArea,
+  requestAnimationFrame: (callback) => callback(),
+};
+
+global.requestAnimationFrame = global.window.requestAnimationFrame;
+
+global.document = {
+  querySelector(selector) {
+    querySelectorCalls.push(selector);
+    if (selector === "textarea, div[contenteditable=\"true\"]") {
+      return input;
+    }
+    if (selector === "button[aria-label*=\"send\"], button[type=\"submit\"], button[data-testid*=\"send\"]") {
+      return submitButton;
+    }
+    return null;
+  },
+};
 
 global.console = {
   log: (...args) => logs.push(args.map((arg) => typeof arg === "string" ? arg : JSON.stringify(arg)).join(" ")),
@@ -180,28 +244,247 @@ require(path.resolve(process.cwd(), "extension/content.js"));
 const sendResponse = (response) => contentResponses.push(response);
 const returnValue = onMessageListener({ cmd: "generate", payload: "data" }, {}, sendResponse);
 
-process.stdout.write(JSON.stringify({
-  logs,
-  sent,
-  contentResponses,
-  listenerReturnedTrue: returnValue === true,
-}));
+Promise.resolve(returnValue).then((resolved) => {
+  process.stdout.write(JSON.stringify({
+    logs,
+    sent,
+    contentResponses,
+    inputValue: input.value,
+    inputEvents,
+    buttonClicks,
+    querySelectorCalls,
+    listenerReturnedTrue: resolved === true,
+  }));
+});
 `, &result)
 
-	if len(result.ContentResponses) != 1 {
-		t.Fatalf("content script sendResponse calls = %d, want 1", len(result.ContentResponses))
+		if len(result.ContentResponses) != 0 {
+			t.Fatalf("content script sendResponse calls = %d, want 0 on successful staged delivery", len(result.ContentResponses))
+		}
+
+		if got := result.InputValue; got != "data" {
+			t.Fatalf("input value = %q, want data", got)
+		}
+
+		if result.InputEvents != 1 {
+			t.Fatalf("input events = %d, want 1", result.InputEvents)
+		}
+
+		if result.ButtonClicks != 1 {
+			t.Fatalf("button clicks = %d, want 1", result.ButtonClicks)
+		}
+
+		if !contains(result.QuerySelectorCalls, `textarea, div[contenteditable="true"]`) {
+			t.Fatalf("expected input selector query, got %v", result.QuerySelectorCalls)
+		}
+
+		if !contains(result.QuerySelectorCalls, `button[aria-label*="send"], button[type="submit"], button[data-testid*="send"]`) {
+			t.Fatalf("expected submit selector query, got %v", result.QuerySelectorCalls)
+		}
+
+		if !result.ListenerReturnedTrue {
+			t.Fatal("content script onMessage listener must return true for async response support")
+		}
+	})
+
+	t.Run("returns input_not_found when notebook input is unavailable", func(t *testing.T) {
+		var result nodeResult
+		runNodeJSON(t, `
+const path = require("path");
+const logs = [];
+const sent = [];
+const contentResponses = [];
+let onMessageListener = null;
+
+global.Event = class FakeEvent {
+  constructor(type, options = {}) {
+    this.type = type;
+    this.bubbles = options.bubbles === true;
+  }
+};
+
+global.window = {
+  HTMLTextAreaElement: function FakeTextArea() {},
+  requestAnimationFrame: (callback) => callback(),
+};
+
+global.requestAnimationFrame = global.window.requestAnimationFrame;
+
+global.document = {
+  querySelector() {
+    return null;
+  },
+};
+
+global.console = {
+  log: (...args) => logs.push(args.map((arg) => typeof arg === "string" ? arg : JSON.stringify(arg)).join(" ")),
+  warn: () => {},
+  error: () => {},
+};
+
+global.chrome = {
+  runtime: {
+    sendMessage: (message) => sent.push(message),
+    onMessage: {
+      addListener(fn) {
+        onMessageListener = fn;
+      },
+    },
+  },
+};
+
+require(path.resolve(process.cwd(), "extension/content.js"));
+
+const sendResponse = (response) => contentResponses.push(response);
+const returnValue = onMessageListener({ cmd: "generate", payload: "data" }, {}, sendResponse);
+
+Promise.resolve(returnValue).then((resolved) => {
+  setTimeout(() => {
+    process.stdout.write(JSON.stringify({
+      contentResponses,
+      listenerReturnedTrue: resolved === true,
+    }));
+  }, 0);
+});
+`, &result)
+
+		if len(result.ContentResponses) != 1 {
+			t.Fatalf("content script sendResponse calls = %d, want 1", len(result.ContentResponses))
+		}
+
+		if got := result.ContentResponses[0]["status"]; got != "error" {
+			t.Fatalf("content response status = %v, want error", got)
+		}
+
+		if got := result.ContentResponses[0]["error"]; got != "input_not_found" {
+			t.Fatalf("content response error = %v, want input_not_found", got)
+		}
+
+		if !result.ListenerReturnedTrue {
+			t.Fatal("content script onMessage listener must return true when input lookup fails")
+		}
+	})
+
+	t.Run("returns submit_button_not_found when notebook send button is unavailable", func(t *testing.T) {
+		var result nodeResult
+		runNodeJSON(t, `
+const path = require("path");
+const contentResponses = [];
+let onMessageListener = null;
+
+class FakeTextArea {
+  constructor() {
+    this._value = "";
+  }
+
+  dispatchEvent() {
+    return true;
+  }
+}
+
+Object.defineProperty(FakeTextArea.prototype, "value", {
+  get() {
+    return this._value;
+  },
+  set(next) {
+    this._value = next;
+  },
+});
+
+const input = new FakeTextArea();
+let queryCount = 0;
+
+global.Event = class FakeEvent {
+  constructor(type, options = {}) {
+    this.type = type;
+    this.bubbles = options.bubbles === true;
+  }
+};
+
+global.window = {
+  HTMLTextAreaElement: FakeTextArea,
+  requestAnimationFrame: (callback) => callback(),
+};
+
+global.requestAnimationFrame = global.window.requestAnimationFrame;
+
+global.document = {
+  querySelector() {
+    queryCount += 1;
+    if (queryCount === 1) {
+      return input;
+    }
+    return null;
+  },
+};
+
+global.console = {
+  log() {},
+  warn() {},
+  error() {},
+};
+
+global.chrome = {
+  runtime: {
+    sendMessage() {},
+    onMessage: {
+      addListener(fn) {
+        onMessageListener = fn;
+      },
+    },
+  },
+};
+
+require(path.resolve(process.cwd(), "extension/content.js"));
+
+const sendResponse = (response) => contentResponses.push(response);
+const returnValue = onMessageListener({ cmd: "generate", payload: "data" }, {}, sendResponse);
+
+Promise.resolve(returnValue).then((resolved) => {
+  setTimeout(() => {
+    process.stdout.write(JSON.stringify({
+      contentResponses,
+      listenerReturnedTrue: resolved === true,
+    }));
+  }, 0);
+});
+`, &result)
+
+		if len(result.ContentResponses) != 1 {
+			t.Fatalf("content script sendResponse calls = %d, want 1", len(result.ContentResponses))
+		}
+
+		if got := result.ContentResponses[0]["status"]; got != "error" {
+			t.Fatalf("content response status = %v, want error", got)
+		}
+
+		if got := result.ContentResponses[0]["error"]; got != "submit_button_not_found" {
+			t.Fatalf("content response error = %v, want submit_button_not_found", got)
+		}
+
+		if !result.ListenerReturnedTrue {
+			t.Fatal("content script onMessage listener must return true when submit button lookup fails")
+		}
+	})
+}
+
+func TestExtensionContent_DefinesSelectorCascadeCommentsAndConstants(t *testing.T) {
+	source := readExtensionFile(t, "content.js")
+
+	if !strings.Contains(source, "const SELECTORS = {") {
+		t.Fatal("expected content.js to define SELECTORS constants")
 	}
 
-	if got := result.ContentResponses[0]["status"]; got != "success" {
-		t.Fatalf("content response status = %v, want success", got)
+	if !strings.Contains(source, `INPUT: 'textarea, div[contenteditable="true"]'`) {
+		t.Fatal("expected content.js to define SELECTORS.INPUT for textarea/contenteditable fallback")
 	}
 
-	if got := result.ContentResponses[0]["result"]; got != "mocked code source" {
-		t.Fatalf("content response result = %v, want mocked code source", got)
+	if !strings.Contains(source, `SUBMIT_BUTTON: 'button[aria-label*="send"], button[type="submit"], button[data-testid*="send"]'`) {
+		t.Fatal("expected content.js to define SELECTORS.SUBMIT_BUTTON with resilient send button selectors")
 	}
 
-	if !result.ListenerReturnedTrue {
-		t.Fatal("content script onMessage listener must return true for async response support")
+	if !strings.Contains(source, "Selector cascade: prefer NotebookLM's textarea") {
+		t.Fatal("expected content.js to document the selector cascade for future maintainers")
 	}
 }
 
