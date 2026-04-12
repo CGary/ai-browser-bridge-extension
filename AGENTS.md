@@ -74,9 +74,25 @@ Tests use table-driven style throughout. Key helpers:
 - `requireUnixSocketSupport()` — skip on non-Unix platforms
 - `ioReadAllWithDeadline()` — 2-second deadline to prevent hanging reads
 
-## Development Status
+## 🚫 SDD Phase Boundaries — NO ejecutar tests fuera de `sdd-verify`
 
-Milestones 1–2 complete (CLI, Daemon, IPC, Native Messaging, security hardening, tasks t1–t10). Milestone 3 (Tab Orchestrator — tab registry, exclusive routing, DOM injection) is in progress. Pending tasks: `t11-handshake-registro-tabs`, `t12-gestion-ciclo-vida-tabs`, `t13-orquestacion-enrutamiento-transaccional`.
+**Regla:** `sdd-archive` SOLO recupera artefactos existentes desde Engram y genera el reporte de cierre. NO ejecuta tests, builds, lint, ni verificación de código.
+
+- **Tests y verificación** → responsabilidad exclusiva de `sdd-verify`.
+- **Apply-progress con evidencia TDD** → responsabilidad de `sdd-apply`.
+- **Archivar** → leer artefactos previos, sintetizar estado final, persistir en Engram.
+
+**Por qué**: Ejecutar tests en archive infla el contexto sin necesidad, duplica trabajo ya hecho por `sdd-verify`, y viola el contrato de la fase. Si el verify-report ya existe en Engram, confiar en él.
+
+**Excepción**: Solo ejecutar tests en `sdd-archive` si el usuario lo pide explícitamente.
+
+## 🔍 Proactive Context Retrieval (Engram)
+
+**Mandatory Search Strategy:** Before attempting to search for a specific SDD phase (e.g., `sdd/t15/spec`), you MUST perform a broad search using ONLY the change identifier (e.g., `t15-observador-mutacion-extraccion`).
+
+- **Why**: Broad searches capture the entire lifecycle of a change (exploration, proposal, specs, design, tasks, and progress) in a single turn, preventing "not found" errors caused by overly specific phase queries or naming mismatches.
+- **When**: Trigger this broad search at the beginning of ANY SDD phase (`/sdd-explore`, `/sdd-propose`, `/sdd-spec`, `/sdd-design`, `/sdd-tasks`, `/sdd-apply`, `/sdd-verify`).
+- **How**: Use `mcp_engram_mem_search(project='aibbe', query='[CHANGE-NAME]')`.
 
 ## 🔍 Memory Retrieval Gap Protocol (Engram)
 
