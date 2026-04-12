@@ -23,6 +23,7 @@ type extensionContentSpec struct {
 type nodeResult struct {
 	Logs                      []string         `json:"logs"`
 	Sent                      []map[string]any `json:"sent"`
+	SentTabMessages           []sentTabMessage `json:"sentTabMessages"`
 	MapSets                   []nodeMapSet     `json:"mapSets"`
 	MapDeletes                []int            `json:"mapDeletes"`
 	NativePostMessages        []map[string]any `json:"nativePostMessages"`
@@ -39,11 +40,17 @@ type nodeResult struct {
 	TabRemovedListenerExists  bool             `json:"tabRemovedListenerExists"`
 	ListenerReturnedTrue      bool             `json:"listenerReturnedTrue"`
 	SettleTimerPending        bool             `json:"settleTimerPending"`
+	FinalTabState             string           `json:"finalTabState"`
 }
 
 type nodeMapSet struct {
 	Key   int                    `json:"key"`
 	Value map[string]interface{} `json:"value"`
+}
+
+type sentTabMessage struct {
+	TabID   int            `json:"tabId"`
+	Message map[string]any `json:"message"`
 }
 
 func readExtensionManifest(t *testing.T) extensionManifest {
@@ -1773,6 +1780,15 @@ const nativePostMessages = [];
 let nativeMessageListener = null;
 let listener = null;
 let sentTabMessages = [];
+let capturedRegistry = null;
+const NativeMap = global.Map;
+
+global.Map = class ObservedMap extends NativeMap {
+  constructor(...args) {
+    super(...args);
+    capturedRegistry = this;
+  }
+};
 
 const port = {
   onMessage: {
@@ -1826,6 +1842,7 @@ listener({ type: "HANDSHAKE", service: "notebooklm" }, { tab: { id: 101 } });
     logs,
     nativePostMessages,
     sentTabMessages,
+    finalTabState: capturedRegistry?.get(101)?.state ?? null,
     nativeMessageListenerSeen: typeof nativeMessageListener === "function",
     handshakeListenerExists: typeof listener === "function",
   }));
@@ -1846,6 +1863,26 @@ listener({ type: "HANDSHAKE", service: "notebooklm" }, { tab: { id: 101 } });
 
 		if got := result.NativePostMessages[0]["result"]; got != "mocked code source" {
 			t.Fatalf("response result = %v, want mocked code source", got)
+		}
+
+		if len(result.SentTabMessages) != 1 {
+			t.Fatalf("chrome.tabs.sendMessage calls = %d, want 1", len(result.SentTabMessages))
+		}
+
+		if got := result.SentTabMessages[0].TabID; got != 101 {
+			t.Fatalf("chrome.tabs.sendMessage tabId = %d, want 101", got)
+		}
+
+		if got := result.SentTabMessages[0].Message["cmd"]; got != "generate" {
+			t.Fatalf("chrome.tabs.sendMessage cmd = %v, want generate", got)
+		}
+
+		if got := result.SentTabMessages[0].Message["payload"]; got != "test" {
+			t.Fatalf("chrome.tabs.sendMessage payload = %v, want test", got)
+		}
+
+		if got := result.FinalTabState; got != "free" {
+			t.Fatalf("final tab state = %q, want free", got)
 		}
 	})
 
