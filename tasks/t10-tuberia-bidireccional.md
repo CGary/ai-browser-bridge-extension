@@ -18,3 +18,23 @@ Verificar la integridad del puente de comunicación consolidando las implementac
 3. Documentación técnica actualizada (Swagger, README o comentarios de código).
 4. Pull Request revisado y aprobado por un par.
 5. Ausencia de regresiones en el entorno de integración.
+
+---
+
+## Status: ✅ Implemented & Archived
+
+**Archived**: 2026-04-08 | **Engram Archive**: #349
+**SDD Cycle**: explore (#320) → propose (#327) → spec (#329) → design (#335) → tasks (#338) → apply (#343) → verify (#347) → archive (#349)
+
+**Files Modified**:
+- `daemon/main.go` — Shared `responseCh` between stdinLoop and handleConnection
+- `daemon/main_test.go` — Bidirectional pipe tests
+- `internal/ipc/ipc.go` — Removed `ipc.Response`, added channel-based response
+- `internal/nativemessaging/nativemessaging.go` + tests — Response bridge
+- `extension/background.js` — Echo service for NM round-trip verification
+
+**Verification Evidence**:
+- 15/15 tasks complete
+- 92.9% coverage in nativemessaging package
+- Extension tests passed
+- Socket tests skipped due to sandbox limitation (environmental, not code issue)

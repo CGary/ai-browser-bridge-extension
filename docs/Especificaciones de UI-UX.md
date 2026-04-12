@@ -28,11 +28,11 @@ Las "vistas" se abstraen en los flujos de salida de la terminal y las consolas d
 
 **Flujo de Excepción DOM: Tiempo de Espera Agotado (Timeout)**
 1.  **Ejecución:** Pasos 1 al 5 del flujo principal completados.
-2.  **Límite Alcanzado:** El temporizador interno del Content Script agota el límite sin detectar la mutación esperada en el DOM.
-3.  **Interrupción:** Se aborta el `MutationObserver` y el Content Script emite una excepción tipificada al Background Script.
-4.  **Liberación:** El Background Script cambia el estado del `tabId` a `libre`.
-5.  **Reporte de Fallo:** El Daemon recibe la excepción, imprime `[ERROR] [Content Script] Timeout en la observación de mutación` en la salida `stderr`.
-6.  **Terminación Forzada:** El Daemon invoca `os.Exit(1)`, finalizando la ejecución con código de salida distinto de cero para interrumpir cualquier pipeline dependiente.
+2.  **Límite Alcanzado:** El temporizador interno del Content Script (`window.__AIBBE_TIMEOUT ?? 150000ms`) agota el límite sin detectar la mutación esperada en el DOM.
+3.  **Interrupción:** Se aborta el `MutationObserver` y el Content Script emite un objeto JSON de error `{ status: "error", error: "response_timeout" }` como respuesta de la transacción.
+4.  **Propagación:** El error viaja por el pipeline completo: Content Script → Background Script → Native Messaging port → Daemon → CLI `stderr`.
+5.  **Liberación:** El Background Script cambia el estado del `tabId` a `libre` en el bloque `finally`.
+6.  **Terminación:** El Daemon imprime el error en `stderr` y finaliza con código de salida `1`.
 
 ## 4. Estados de Componentes y Manejo de Errores
 El sistema implementa un patrón Fail-Fast para evitar procesos huérfanos y estados de espera indefinida.

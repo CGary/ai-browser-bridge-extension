@@ -22,3 +22,20 @@ Garantizar la integridad del inventario de pestañas en el Background Script. El
 2. Pruebas manuales demuestran que el cierre de pestañas libera las entradas en el registro (monitoreo vía consola del Background Script).
 3. Pull Request revisado y aprobado por un par.
 4. Ausencia de regresiones en la estabilidad del Background Script.
+
+---
+
+## Status: ✅ Implemented & Archived
+
+**Archived**: 2026-04-09 | **Engram Archive**: #400
+**SDD Cycle**: explore (#378) → propose (#380) → spec (#381) → design (#382) → tasks (#383) → apply (#385) → verify (#387) → archive (#400)
+
+**Files Modified**:
+- `extension/background.js` — Added `chrome.tabs.onRemoved` listener (lines 80-87)
+- `extension_handshake_test.go` — Added `TestExtensionBackground_PurgesClosedTabsReactively` with 3 subtests
+
+**Verification Evidence**:
+- 10/10 tasks complete (4.1 converted to advisory)
+- Manual Chromium verification: `[aibbe] Tab <id> purged from registry` confirmed
+- `tabRegistry.size` remained `0` after closing non-NotebookLM tabs
+- TDD Compliance: 6/6 checks passed

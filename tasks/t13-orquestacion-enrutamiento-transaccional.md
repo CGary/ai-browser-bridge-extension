@@ -30,3 +30,15 @@ Consolidar la lógica del "Tab Orchestrator" mediante el enrutamiento determinis
 3. El estado de la pestaña transiciona correctamente de `free` a `busy` y de vuelta a `free`.
 4. Pull Request revisado y aprobado por un par.
 5. Ausencia de regresiones en el entorno de integración.
+
+---
+
+## Status: ✅ Implemented implicitly via t10-tuberia-bidireccional
+
+**No dedicated SDD archive** — The tab orchestrator functionality described in this task is already implemented as part of the t10 bidirectional pipe integration.
+
+**Where to find it**:
+- `extension/background.js` — `findFreeTab()`, `entry.state = "busy"`, `chrome.tabs.sendMessage(tabId, ...)`, `finally { tabRegistry.get(tabId).state = "free" }` (lines 22-48)
+- The free→busy→free state transition, routing to the first available tab, and response forwarding to the Native Messaging port were all implemented in the t10 archive cycle (#349, 2026-04-08).
+
+**Verification**: See t10 archive report (#349) for full SDD cycle evidence.

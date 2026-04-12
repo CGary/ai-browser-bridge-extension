@@ -95,3 +95,15 @@
   * **Dado** que el sistema ha emitido el requerimiento y el observador de mutación está activo
   * **Cuando** se alcanza el límite de tiempo configurado sin que el DOM presente el resultado esperado
   * **Entonces** el Content Script aborta el `MutationObserver`, emite un evento JSON tipificado como excepción de "Timeout" hacia el Background Script y libera el estado de la pestaña a "libre", permitiendo a la CLI finalizar con error.
+
+---
+
+## Nota de Implementación: Timeout
+
+**Estado**: ✅ **Implementado** (contrario al plan original de "postergado").
+
+El timeout se implementó en `t15-observador-mutacion-extraccion` con las siguientes características:
+- **Default**: 150 segundos (`window.__AIBBE_TIMEOUT ?? 150000`).
+- **Configurable**: Variable global `window.__AIBBE_TIMEOUT` para pruebas y ajuste.
+- **Settle timer**: 750ms de estabilidad (`window.__AIBBE_SETTLE_MS`) antes de confirmar la respuesta.
+- **Error propagation**: Retorna `{ status: "error", error: "response_timeout" }` por el pipeline completo de respuesta (no solo stderr).

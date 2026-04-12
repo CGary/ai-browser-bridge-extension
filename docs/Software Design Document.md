@@ -29,3 +29,35 @@ El modelo de distribución se basa en la transferencia de código fuente, descar
 * **Aislamiento IPC:** Los permisos del socket Unix local deben restringirse al usuario propietario del sistema que ejecuta la sesión del navegador (`chmod 0600`). Esta medida es crítica para mitigar vectores de escalada de privilegios o la ejecución de comandos arbitrarios por parte de otros procesos o usuarios concurrentes en la misma máquina.
 * **Jerarquía de Guardarraíles de Tamaño:** La validación de tamaño opera en dos capas. La capa **IPC** es el guardarraíl primario y rechaza cualquier solicitud de la CLI que exceda 1 MiB antes de que llegue a la lógica del daemon. La capa **Native Messaging** es un guardarraíl secundario y defensivo: vuelve a validar el tamaño justo antes de escribir hacia Chromium para cubrir futuros casos donde el daemon construya mensajes internos más grandes que la carga original recibida por IPC.
 * **Chequeo Defensivo en Native Messaging:** Aunque en el flujo actual el daemon reenvía el payload IPC sin expandirlo, el límite de 1 MiB en Native Messaging se conserva como red de seguridad del protocolo. Esto documenta explícitamente que IPC maneja los límites de entrada externos, mientras que Native Messaging protege la salida del host frente a crecimiento interno futuro.
+
+---
+
+## 7. Estado de Implementación (post-MVP)
+
+> **Nota**: Este documento representa el diseño base del MVP. Las siguientes capacidades fueron implementadas después del diseño original y están documentadas en los archive reports de Engram. Para deltas de implementación, consultar los reportes individuales de cada cambio (t7–t16).
+
+### Componentes implementados (resumen)
+
+| Componente | Archivo | Estado | Change |
+|---|---|---|---|
+| IPC types/constants | `internal/ipc/ipc.go` | ✅ | t1–t3 |
+| Native Messaging writer/reader | `internal/nativemessaging/nativemessaging.go` | ✅ | t4, t9 |
+| CLI client | `cmd/cli/main.go` | ✅ | t3 |
+| Go Daemon (full pipeline) | `daemon/main.go` | ✅ | t1–t6, t9–t10 |
+| Extension manifest (MV3) | `extension/manifest.json` | ✅ | t7 |
+| NM host manifest | `configs/aibbe.nm-host.json` | ✅ | t8 |
+| Background Script (SW) | `extension/background.js` | ✅ | t7, t10–t12 |
+| Content Script | `extension/content.js` | ✅ | t11, t14–t15 |
+
+### Extensiones al diseño original
+
+El código actual incluye capacidades que **no estaban en este SDD original**:
+
+1. **`tabRegistry` (volatile Map)** — `background.js` mantiene un `Map<tabId, {state, service, lastSeen}>` descubierto vía HANDSHAKE del Content Script. Cada tab registrado transiciona `libre` → `ocupado` → `libre` por transacción. *(t11, t12, t13)*
+2. **`chrome.tabs.onRemoved` listener** — Purga reactiva de tabs cerrados del registry. *(t12)*
+3. **`findFreeTab()` routing** — El Background Script localiza el primer tab `libre`, lo marca `busy`, envía el payload vía `chrome.tabs.sendMessage`, y resetea el estado en `finally`. *(t10/t13)*
+4. **DOM Injection (`injectAndSubmit`)** — El Content Script localiza el input, inyecta el payload vía `execCommand("insertText")` (trusted event) o fallback de native setter, y hace click en el submit button. *(t14)*
+5. **MutationObserver extraction (`waitForAIResponse`)** — Observa `document.body` con settle timer (750ms), timeout configurable (`window.__AIBBE_TIMEOUT ?? 150000`), extracción de bloques `<code>/<pre>`, y limpieza de ruido de citaciones. *(t15)*
+6. **Error response pipeline** — Los errores (timeout, input not found, etc.) se propagan como objetos JSON `{ status: "error", error: "<code>" }` por el pipeline completo de respuesta, no solo via stderr. *(t15, t16)*
+
+Para detalles de implementación por cambio, consultar los archive reports en Engram bajo `sdd/{change-name}/archive-report`.

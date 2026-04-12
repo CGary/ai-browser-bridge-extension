@@ -7,7 +7,7 @@ El proyecto se ejecutará bajo un modelo de recurso único (1 FTE - Senior Softw
 * **Hito 1 (M1): Infraestructura IPC Segura.** Despliegue del binario Daemon y establecimiento del canal de comunicación local seguro (Socket Unix) con la CLI.
 * **Hito 2 (M2): Puente Native Messaging.** Configuración del manifiesto de Chromium y establecimiento de la tubería de datos síncrona/asíncrona entre el Daemon y el Background Script.
 * **Hito 3 (M3): Orquestador de Pestañas.** Implementación del registro de estado en memoria para el enrutamiento determinista de requerimientos hacia la interfaz web activa.
-* **Hito 4 (M4): Motor de Inyección y Extracción (RAG Local).** Automatización de la inyección de contexto en el DOM objetivo y captura de la salida generada (Happy Path).
+* **Hito 4 (M4): Motor de Inyección y Extracción (RAG Local).** ~~Automatización de la inyección de contexto en el DOM objetivo y captura de la salida generada (Happy Path).~~ — ✅ **COMPLETADO**. Incluye inyección DOM (t14), extracción via MutationObserver con timeout (t15), y fortalecimiento de validaciones (t16).
 * **Hito 5 (M5): Pruebas End-to-End (MVP).** Validación transaccional completa desde la invocación en CLI hasta el retorno del código fuente autogenerado.
 
 ## 3. Planificación de Sprints (Backlog Mapping)
@@ -25,12 +25,13 @@ Dada la selección de un modelo Kanban, las iteraciones se definen como lotes de
 * **Iteración Kanban 3: Capa de Manipulación DOM (Épica 3)**
     * **Implementar:** User Story 3.1 (Inyección imperceptible de contexto técnico).
     * **Implementar:** Lógica de extracción reactiva post-mutación (Escenario 1 de User Story 3.2).
-    * *Postergado:* Escenario 2 de User Story 3.2 (Timeout estricto y recolección de basura por latencia).
+    * ~~*Postergado:* Escenario 2 de User Story 3.2 (Timeout estricto y recolección de basura por latencia).~~ — **Implementado en t15** con timeout de 150s configurable y settle timer de 750ms.
 
 ## 4. Matriz de Riesgos y Mitigación
 * **Riesgo 1: Límite de Memoria de Chromium Native Messaging (1 MB).** Al omitir el manejo de errores complejos en el MVP, un payload excesivo cerrará el canal abruptamente. 
   * *Mitigación:* Implementar un validador de longitud estricto (bloqueante) en el paso de mensajes de la CLI antes de enviar al socket Unix.
 * **Riesgo 2: Bloqueo de Ejecución IPC en Entorno Local.** Permisos incorrectos en el socket `/tmp/aibbe.sock` impedirán la comunicación inicial, deteniendo el flujo completo.
   * *Mitigación:* Codificar la eliminación forzada del archivo `.sock` en la rutina de inicialización del Daemon en Go antes de aplicar el enmascaramiento `0600` para prevenir conflictos de estado residual en el sistema de archivos de la máquina anfitriona.
-* **Riesgo 3: Procesos Zombis por Ausencia de Timeout.** Al postergar la US 3.2 (Escenario 2), mutaciones inesperadas en la interfaz de la IA dejarán la CLI en estado de espera indefinida.
-  * *Mitigación:* Establecer un atajo de teclado a nivel de CLI (ej. `Ctrl+C`) que cierre el socket local y finalice la transacción del lado del cliente, asumiendo la pérdida de sincronía del `tabId` en el navegador hasta el reinicio de la pestaña.
+* **Riesgo 3: ~~Procesos Zombis por Ausencia de Timeout.~~** ~~Al postergar la US 3.2 (Escenario 2), mutaciones inesperadas en la interfaz de la IA dejarán la CLI en estado de espera indefinida.~~
+  * ~~Mitigación:~~ Establecer un atajo de teclado a nivel de CLI (ej. `Ctrl+C`) que cierre el socket local y finalice la transacción del lado del cliente, asumiendo la pérdida de sincronía del `tabId` en el navegador hasta el reinicio de la pestaña.
+  * **Estado actual**: ✅ **Mitigado automáticamente**. El Content Script implementa un timeout de 150s configurable (`window.__AIBBE_TIMEOUT`) con settle timer de 750ms. Al agotarse el tiempo, retorna `{ status: "error", error: "response_timeout" }` por el pipeline completo, liberando el tab a estado `free` sin necesidad de intervención manual.

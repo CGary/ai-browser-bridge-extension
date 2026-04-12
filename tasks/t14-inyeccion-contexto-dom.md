@@ -27,3 +27,19 @@ Implementar la lógica en el Content Script para inyectar el texto del requerimi
 3. Documentación técnica actualizada (Swagger, README o comentarios de código).
 4. Pull Request revisado y aprobado por un par.
 5. Ausencia de regresiones en el entorno de integración.
+
+---
+
+## Status: ✅ Implemented & Archived
+
+**Archived**: 2026-04-10 | **Engram Archive**: #450
+**SDD Cycle**: explore (#414) → propose (#417) → spec (#419) → design (#421) → tasks (#423) → apply (#424) → verify (#433) → archive (#450)
+
+**Files Modified**:
+- `extension/content.js` — Core implementation: `SELECTORS` constants, `injectAndSubmit(payload)`, `setInputValue()`, native setter bypass for React state, `waitForNextFrame()`
+
+**Verification Evidence**:
+- Strict TDD: 6/6 checks passed
+- 4/4 spec scenarios compliant
+- 4 relevant t14 tests in `extension_handshake_test.go` (happy path, input_not_found, submit_button_not_found, selector validation)
+- Manual browser verification deferred to t15 (per user decision #439, #440)

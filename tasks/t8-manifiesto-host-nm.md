@@ -19,3 +19,21 @@ Vincular el entorno de ejecución de Chromium con el binario del Daemon local. R
 3. Documentación técnica actualizada (Swagger, README o comentarios de código).
 4. Pull Request revisado y aprobado por un par.
 5. Ausencia de regresiones en el entorno de integración.
+
+---
+
+## Status: ✅ Implemented & Archived
+
+**Archived**: 2026-04-06 | **Engram Archive**: #286
+**SDD Cycle**: explore (#269) → propose (#271) → spec (#273) → design (#275) → tasks (#276) → apply (#278) → verify (#283) → archive (#286)
+
+**Files Created/Modified**:
+- `configs/aibbe.nm-host.json` — Native Messaging host manifest (source of truth)
+- `configs/nmhost_test.go` — 6 unit tests validating schema/path/type/origin
+- `~/.config/google-chrome/NativeMessagingHosts/aibbe.json` — Installed manifest
+
+**Verification Evidence**:
+- Build: ✅ Passed
+- Tests: ✅ 22 passed
+- Runtime: ✅ Daemon spawned by Chromium (PID 290464)
+- Extension console: ✅ No errors on `connectNative("aibbe")`
