@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"os"
 	"sync"
@@ -82,7 +81,7 @@ func run(socketPath string, stop <-chan struct{}) error {
 
 	initResponseChannel()
 
-	log.Printf("daemon listening on %s with mode 0600", socketPath)
+	fmt.Fprintf(os.Stderr, "[INFO] [Daemon] daemon listening on %s with mode 0600\n", socketPath)
 
 	stopSignal := make(chan struct{})
 	go func() {
@@ -128,7 +127,7 @@ func stdinLoopUntilStop(r io.Reader, stop <-chan struct{}, onMessage func([]byte
 				default:
 				}
 			}
-			_, _ = fmt.Fprintln(os.Stderr, fatalProtocolMessage)
+			fmt.Fprintln(os.Stderr, fatalProtocolMessage)
 			exitFunc(1)
 			return
 		}
@@ -141,7 +140,8 @@ func main() {
 	socketPath := ipc.SocketPathForProcess()
 	stop := make(chan struct{})
 	if err := run(socketPath, stop); err != nil {
-		log.Fatal(err)
+		fmt.Fprintf(os.Stderr, "[FATAL] [Daemon] %v\n", err)
+		os.Exit(1)
 	}
 }
 
@@ -150,45 +150,49 @@ func handleConnection(conn net.Conn) {
 
 	data, err := io.ReadAll(io.LimitReader(conn, ipc.MaxRequestSize+1))
 	if err != nil {
-		log.Printf("read error: %v", err)
+		fmt.Fprintf(os.Stderr, "[ERROR] [Daemon] read error: %v\n", err)
+		return
+	}
+
+	if len(data) == 0 {
 		return
 	}
 
 	if len(data) > ipc.MaxRequestSize {
-		log.Printf("request too large: %d bytes", len(data))
+		fmt.Fprintf(os.Stderr, "[ERROR] [Daemon] request too large: %d bytes\n", len(data))
 		return
 	}
 
 	var req ipc.Request
 	if err := json.Unmarshal(data, &req); err != nil {
-		log.Printf("invalid JSON: %v", err)
+		fmt.Fprintf(os.Stderr, "[ERROR] [Daemon] invalid JSON: %v\n", err)
 		return
 	}
 
 	if req.Cmd == "" {
-		log.Printf("missing required field: cmd")
+		fmt.Fprintf(os.Stderr, "[ERROR] [Daemon] missing required field: cmd\n")
 		return
 	}
 
-	log.Printf("received: cmd=%s payload=%s", req.Cmd, req.Payload)
+	fmt.Fprintf(os.Stderr, "[INFO] [Daemon] received: cmd=%s payload=%s\n", req.Cmd, req.Payload)
 
 	if err := nativemessaging.WriteMessage(nativeOut, data); err != nil {
-		log.Printf("native messaging write: %v", err)
+		fmt.Fprintf(os.Stderr, "[ERROR] [Daemon] native messaging write: %v\n", err)
 		return
 	}
 
 	if responseCh == nil {
-		log.Printf("native messaging response channel not initialized")
+		fmt.Fprintf(os.Stderr, "[ERROR] [Daemon] native messaging response channel not initialized\n")
 		return
 	}
 
 	resp, ok := <-responseCh
 	if !ok {
-		log.Printf("native messaging transport closed while waiting for response")
+		fmt.Fprintf(os.Stderr, "[ERROR] [Daemon] native messaging transport closed while waiting for response\n")
 		return
 	}
 
 	if _, err := conn.Write(resp); err != nil {
-		log.Printf("write response error: %v", err)
+		fmt.Fprintf(os.Stderr, "[ERROR] [Daemon] write response error: %v\n", err)
 	}
 }

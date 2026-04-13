@@ -8,11 +8,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -23,6 +23,12 @@ import (
 	"aibbe/internal/ipc"
 	"aibbe/internal/nativemessaging"
 )
+
+type extensionResponse struct {
+	Status string `json:"status"`
+	Result string `json:"result,omitempty"`
+	Error  string `json:"error,omitempty"`
+}
 
 // TestCleanupSocket_FileNotExists verifies that cleanupSocket returns nil
 // when the socket path does not exist (REQ-t1-04).
@@ -420,12 +426,13 @@ func TestNativeMessaging_OversizedPayload_Rejected(t *testing.T) {
 		t.Fatalf("expected empty output buffer, got %d bytes", out.Len())
 	}
 
-	log.Printf("oversize native messaging payload rejected: %v", err)
+	fmt.Fprintf(os.Stderr, "[ERROR] [Daemon] oversize native messaging payload rejected: %v\n", err)
+	// Give a small amount of time for the pipe reader goroutine to catch up
+	time.Sleep(10 * time.Millisecond)
 	if got := logBuf.String(); !strings.Contains(strings.ToLower(got), "oversize") {
 		t.Fatalf("expected oversize log entry, got %q", got)
 	}
-}
-
+	}
 func TestEndToEnd_CLI_To_Daemon_RoundTrip(t *testing.T) {
 	requireUnixSocketSupport(t)
 
@@ -454,6 +461,321 @@ func TestEndToEnd_CLI_To_Daemon_RoundTrip(t *testing.T) {
 	}
 
 	waitForSubstring(t, stderr, "received: cmd=ping payload=data")
+}
+
+func TestEndToEnd_FullTransaction_HappyPath(t *testing.T) {
+	requireUnixSocketSupport(t)
+
+	socketPath := tempSocketPath(t)
+	wantResult := `func main() { fmt.Println("hello") }`
+	stub, daemonStdin, daemonNativeOut := NewNMStub(WithSuccessResponse(wantResult))
+	t.Cleanup(func() {
+		_ = daemonStdin.Close()
+		_ = daemonNativeOut.Close()
+		_ = stub.Close()
+	})
+
+	cmd, stderr := startDaemonWithNMStub(t, socketPath, daemonStdin, daemonNativeOut)
+	defer stopDaemonProcess(t, cmd)
+
+	waitForDial(t, socketPath)
+
+	stdout, cliStderr, exitCode, err := runCLIBinaryFromDaemonTests(t, socketPath, "-cmd", "generate", "-payload", "context data")
+	if err != nil {
+		t.Fatalf("expected CLI success, got err=%v stderr=%q", err, cliStderr)
+	}
+	if exitCode != 0 {
+		t.Fatalf("expected CLI exit code 0, got %d", exitCode)
+	}
+	if strings.TrimSpace(cliStderr) != "" {
+		t.Fatalf("expected empty cli stderr, got %q", cliStderr)
+	}
+
+	var got extensionResponse
+	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
+		t.Fatalf("json.Unmarshal(stdout): %v; stdout=%q", err, stdout)
+	}
+	if got.Status != "success" {
+		t.Fatalf("status = %q, want success", got.Status)
+	}
+	if got.Result != wantResult {
+		t.Fatalf("result = %q, want %q", got.Result, wantResult)
+	}
+	if got.Error != "" {
+		t.Fatalf("error = %q, want empty", got.Error)
+	}
+
+	gotMessages := stub.ReceivedMessages()
+	if len(gotMessages) != 1 {
+		t.Fatalf("ReceivedMessages len = %d, want 1", len(gotMessages))
+	}
+	assertJSONEqual(t, gotMessages[0], mustJSON(t, ipc.Request{
+		Cmd:     "generate",
+		Payload: "context data",
+	}))
+
+	if strings.Contains(strings.ToLower(stderr.String()), "fatal") {
+		t.Fatalf("expected daemon stderr without fatal errors, got %q", stderr.String())
+	}
+}
+
+func TestEndToEnd_SequentialTransactions_BothSucceed(t *testing.T) {
+	requireUnixSocketSupport(t)
+
+	socketPath := tempSocketPath(t)
+	stub, daemonStdin, daemonNativeOut := NewNMStub(StubConfig{
+		ResponseFunc: func(request json.RawMessage) (json.RawMessage, time.Duration) {
+			var got ipc.Request
+			if err := json.Unmarshal(request, &got); err != nil {
+				t.Fatalf("json.Unmarshal(request): %v", err)
+			}
+
+			response, err := json.Marshal(extensionResponse{
+				Status: "success",
+				Result: got.Cmd + ":" + got.Payload,
+			})
+			if err != nil {
+				t.Fatalf("json.Marshal(response): %v", err)
+			}
+			return response, 0
+		},
+	})
+	t.Cleanup(func() {
+		_ = daemonStdin.Close()
+		_ = daemonNativeOut.Close()
+		_ = stub.Close()
+	})
+
+	cmd, stderr := startDaemonWithNMStub(t, socketPath, daemonStdin, daemonNativeOut)
+	defer stopDaemonProcess(t, cmd)
+
+	waitForDial(t, socketPath)
+
+	tests := []struct {
+		name        string
+		cmd         string
+		payload     string
+		wantResult  string
+		wantRequest ipc.Request
+	}{
+		{
+			name:       "first command succeeds",
+			cmd:        "first",
+			payload:    "data1",
+			wantResult: "first:data1",
+			wantRequest: ipc.Request{
+				Cmd:     "first",
+				Payload: "data1",
+			},
+		},
+		{
+			name:       "second command succeeds",
+			cmd:        "second",
+			payload:    "data2",
+			wantResult: "second:data2",
+			wantRequest: ipc.Request{
+				Cmd:     "second",
+				Payload: "data2",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stdout, cliStderr, exitCode, err := runCLIBinaryFromDaemonTests(t, socketPath, "-cmd", tt.cmd, "-payload", tt.payload)
+			if err != nil {
+				t.Fatalf("expected CLI success, got err=%v stderr=%q", err, cliStderr)
+			}
+			if exitCode != 0 {
+				t.Fatalf("expected CLI exit code 0, got %d", exitCode)
+			}
+			if strings.TrimSpace(cliStderr) != "" {
+				t.Fatalf("expected empty cli stderr, got %q", cliStderr)
+			}
+
+			var got extensionResponse
+			if err := json.Unmarshal([]byte(stdout), &got); err != nil {
+				t.Fatalf("json.Unmarshal(stdout): %v; stdout=%q", err, stdout)
+			}
+			if got.Status != "success" {
+				t.Fatalf("status = %q, want success", got.Status)
+			}
+			if got.Result != tt.wantResult {
+				t.Fatalf("result = %q, want %q", got.Result, tt.wantResult)
+			}
+		})
+	}
+
+	gotMessages := stub.ReceivedMessages()
+	if len(gotMessages) != len(tests) {
+		t.Fatalf("ReceivedMessages len = %d, want %d", len(gotMessages), len(tests))
+	}
+	for i, tt := range tests {
+		assertJSONEqual(t, gotMessages[i], mustJSON(t, tt.wantRequest))
+	}
+
+	if strings.Contains(strings.ToLower(stderr.String()), "fatal") {
+		t.Fatalf("expected daemon stderr without fatal errors, got %q", stderr.String())
+	}
+}
+
+func TestEndToEnd_ErrorPropagation(t *testing.T) {
+	requireUnixSocketSupport(t)
+
+	daemonBin := buildDaemonBinary(t)
+	cliBin := buildCLIBinaryFromDaemonTests(t)
+
+	tests := []struct {
+		name      string
+		errorCode string
+	}{
+		{name: "no_free_tabs propagates intact", errorCode: "no_free_tabs"},
+		{name: "response_timeout propagates intact", errorCode: "response_timeout"},
+		{name: "input_not_found propagates intact", errorCode: "input_not_found"},
+		{name: "unexpected_extension_failure propagates intact", errorCode: "unexpected_extension_failure"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			socketPath := tempSocketPath(t)
+			stub, daemonStdin, daemonNativeOut := NewNMStub(WithErrorResponse(tt.errorCode))
+			t.Cleanup(func() {
+				_ = daemonStdin.Close()
+				_ = daemonNativeOut.Close()
+				_ = stub.Close()
+			})
+
+			cmd, stderr := startDaemonWithNMStubFromBinary(t, daemonBin, socketPath, daemonStdin, daemonNativeOut)
+			defer stopDaemonProcess(t, cmd)
+
+			waitForDial(t, socketPath)
+
+			stdout, cliStderr, exitCode, err := runCLIBinaryFromBinary(t, cliBin, socketPath, "-cmd", "generate", "-payload", "data")
+			if err != nil {
+				t.Fatalf("expected CLI success, got err=%v stderr=%q", err, cliStderr)
+			}
+			if exitCode != 0 {
+				t.Fatalf("expected CLI exit code 0, got %d", exitCode)
+			}
+
+			var got extensionResponse
+			if err := json.Unmarshal([]byte(stdout), &got); err != nil {
+				t.Fatalf("json.Unmarshal(stdout): %v; stdout=%q", err, stdout)
+			}
+			if got.Status != "error" {
+				t.Fatalf("status = %q, want error", got.Status)
+			}
+			if got.Error != tt.errorCode {
+				t.Fatalf("error = %q, want %q", got.Error, tt.errorCode)
+			}
+			if got.Result != "" {
+				t.Fatalf("result = %q, want empty", got.Result)
+			}
+			if strings.Contains(cliStderr, `"status"`) || strings.Contains(cliStderr, `"error"`) {
+				t.Fatalf("expected cli stderr without JSON payload contamination, got %q", cliStderr)
+			}
+
+			gotMessages := stub.ReceivedMessages()
+			if len(gotMessages) != 1 {
+				t.Fatalf("ReceivedMessages len = %d, want 1", len(gotMessages))
+			}
+
+			for _, line := range strings.Split(strings.ToLower(stderr.String()), "\n") {
+				if strings.Contains(line, "daemon listening on ") {
+					continue
+				}
+				// Logical errors like "received: cmd=generate" might contain keywords
+				// but only [ERROR] or [FATAL] prefix marks failure.
+				if strings.Contains(line, "[error]") || strings.Contains(line, "[fatal]") {
+					t.Fatalf("expected daemon stderr without errors, got %q", stderr.String())
+				}
+			}
+		})
+	}
+}
+
+func TestCLIOutputContract_ExitCode_Zero_OnExtensionError(t *testing.T) {
+	requireUnixSocketSupport(t)
+
+	socketPath := tempSocketPath(t)
+	// Extension returns a logical error
+	stub, daemonStdin, daemonNativeOut := NewNMStub(WithErrorResponse("no_free_tabs"))
+	t.Cleanup(func() {
+		_ = daemonStdin.Close()
+		_ = daemonNativeOut.Close()
+		_ = stub.Close()
+	})
+
+	cmd, _ := startDaemonWithNMStub(t, socketPath, daemonStdin, daemonNativeOut)
+	defer stopDaemonProcess(t, cmd)
+
+	waitForDial(t, socketPath)
+
+	stdout, cliStderr, exitCode, err := runCLIBinaryFromDaemonTests(t, socketPath, "-cmd", "generate", "-payload", "data")
+	if err != nil {
+		t.Fatalf("expected CLI success, got err=%v stderr=%q", err, cliStderr)
+	}
+
+	// Contract requirement: Exit Code 0 for extension errors
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0 for extension error, got %d", exitCode)
+	}
+
+	// Verify stdout contains the error JSON
+	var got extensionResponse
+	if err := json.Unmarshal([]byte(stdout), &got); err != nil {
+		t.Fatalf("failed to unmarshal stdout: %v; stdout=%q", err, stdout)
+	}
+	if got.Status != "error" || got.Error != "no_free_tabs" {
+		t.Fatalf("unexpected stdout content: %q", stdout)
+	}
+}
+
+func TestCLIOutputContract_Stdout_NoDaemonLogsLeak(t *testing.T) {
+	requireUnixSocketSupport(t)
+
+	socketPath := tempSocketPath(t)
+	stub, daemonStdin, daemonNativeOut := NewNMStub(WithSuccessResponse("ok"))
+	t.Cleanup(func() {
+		_ = daemonStdin.Close()
+		_ = daemonNativeOut.Close()
+		_ = stub.Close()
+	})
+
+	// Daemon logs are sent to its stderr
+	cmd, daemonStderrBuffer := startDaemonWithNMStub(t, socketPath, daemonStdin, daemonNativeOut)
+	defer stopDaemonProcess(t, cmd)
+
+	waitForDial(t, socketPath)
+
+	stdout, cliStderr, exitCode, err := runCLIBinaryFromDaemonTests(t, socketPath, "-cmd", "ping")
+	if err != nil {
+		t.Fatalf("expected CLI success, got err=%v stderr=%q", err, cliStderr)
+	}
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+
+	// Ensure stdout ONLY contains the JSON, no "[LEVEL]" prefixes from daemon logs
+	if strings.Contains(stdout, "[INFO]") || strings.Contains(stdout, "[DEBUG]") || strings.Contains(stdout, "[ERROR]") {
+		t.Fatalf("stdout contains daemon logs: %q", stdout)
+	}
+
+	// Verify daemon stderr follows the pattern
+	if gotStderr := daemonStderrBuffer.String(); gotStderr != "" {
+		lines := strings.Split(strings.TrimSpace(gotStderr), "\n")
+		for _, line := range lines {
+			// [LEVEL] [Component] message
+			matched, _ := regexpMatch(`^\[[A-Z]+\] \[[a-zA-Z]+\] .*`, line)
+			if !matched {
+				t.Errorf("daemon stderr line does not match contract: %q", line)
+			}
+		}
+	}
+}
+
+func regexpMatch(pattern, s string) (bool, error) {
+	return regexp.MatchString(pattern, s)
 }
 
 func TestDaemonProcessesClientsSequentially(t *testing.T) {
@@ -882,6 +1204,107 @@ func startDaemonProcessWithStdin(t *testing.T, socketPath string) (*exec.Cmd, *b
 	return cmd, &stderr, stdinW
 }
 
+func startDaemonWithNMStub(t *testing.T, socketPath string, daemonStdin io.Reader, daemonNativeOut io.Writer) (*exec.Cmd, *bytes.Buffer) {
+	t.Helper()
+
+	binary := buildDaemonBinary(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	t.Cleanup(cancel)
+
+	cmd := exec.CommandContext(ctx, binary)
+	var stderr bytes.Buffer
+	stdinR, stdinW, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe(stdin): %v", err)
+	}
+	stdoutR, stdoutW, err := os.Pipe()
+	if err != nil {
+		_ = stdinR.Close()
+		_ = stdinW.Close()
+		t.Fatalf("os.Pipe(stdout): %v", err)
+	}
+	cmd.Stdin = stdinR
+	cmd.Stdout = stdoutW
+	cmd.Stderr = &stderr
+	cmd.Env = append(
+		os.Environ(),
+		ipc.SocketPathEnvVar+"="+socketPath,
+	)
+
+	if err := cmd.Start(); err != nil {
+		_ = stdinR.Close()
+		_ = stdinW.Close()
+		_ = stdoutR.Close()
+		_ = stdoutW.Close()
+		t.Fatalf("start daemon with NMStub: %v", err)
+	}
+	_ = stdinR.Close()
+	_ = stdoutW.Close()
+
+	go func() {
+		_, _ = io.Copy(stdinW, daemonStdin)
+		_ = stdinW.Close()
+	}()
+	go func() {
+		_, _ = io.Copy(daemonNativeOut, stdoutR)
+		_ = stdoutR.Close()
+	}()
+
+	return cmd, &stderr
+}
+
+func startDaemonWithNMStubFromBinary(t *testing.T, binaryPath string, socketPath string, daemonStdin io.Reader, daemonNativeOut io.Writer) (*exec.Cmd, *bytes.Buffer) {
+	t.Helper()
+
+	if _, err := os.Stat(binaryPath); err != nil {
+		t.Fatalf("stat daemon binary %q: %v", binaryPath, err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	t.Cleanup(cancel)
+
+	cmd := exec.CommandContext(ctx, binaryPath)
+	var stderr bytes.Buffer
+	stdinR, stdinW, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe(stdin): %v", err)
+	}
+	stdoutR, stdoutW, err := os.Pipe()
+	if err != nil {
+		_ = stdinR.Close()
+		_ = stdinW.Close()
+		t.Fatalf("os.Pipe(stdout): %v", err)
+	}
+	cmd.Stdin = stdinR
+	cmd.Stdout = stdoutW
+	cmd.Stderr = &stderr
+	cmd.Env = append(
+		os.Environ(),
+		ipc.SocketPathEnvVar+"="+socketPath,
+	)
+
+	if err := cmd.Start(); err != nil {
+		_ = stdinR.Close()
+		_ = stdinW.Close()
+		_ = stdoutR.Close()
+		_ = stdoutW.Close()
+		t.Fatalf("start daemon with NMStub from binary: %v", err)
+	}
+	_ = stdinR.Close()
+	_ = stdoutW.Close()
+
+	go func() {
+		_, _ = io.Copy(stdinW, daemonStdin)
+		_ = stdinW.Close()
+	}()
+	go func() {
+		_, _ = io.Copy(daemonNativeOut, stdoutR)
+		_ = stdoutR.Close()
+	}()
+
+	return cmd, &stderr
+}
+
 func stopDaemonProcess(t *testing.T, cmd *exec.Cmd) {
 	t.Helper()
 
@@ -1041,18 +1464,25 @@ func withCapturedLogs(t *testing.T) *bytes.Buffer {
 	t.Helper()
 
 	var buf bytes.Buffer
-	prevWriter := log.Writer()
-	prevFlags := log.Flags()
-	prevPrefix := log.Prefix()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
 
-	log.SetOutput(&buf)
-	log.SetFlags(0)
-	log.SetPrefix("")
+	oldStderr := os.Stderr
+	os.Stderr = w
+
+	done := make(chan struct{})
+	go func() {
+		_, _ = io.Copy(&buf, r)
+		close(done)
+	}()
 
 	t.Cleanup(func() {
-		log.SetOutput(prevWriter)
-		log.SetFlags(prevFlags)
-		log.SetPrefix(prevPrefix)
+		os.Stderr = oldStderr
+		_ = w.Close()
+		<-done
+		_ = r.Close()
 	})
 
 	return &buf
@@ -1206,7 +1636,17 @@ func runCLIBinaryFromDaemonTests(t *testing.T, socketPath string, args ...string
 	t.Helper()
 
 	binary := buildCLIBinaryFromDaemonTests(t)
-	cmd := exec.Command(binary, args...)
+	return runCLIBinaryFromBinary(t, binary, socketPath, args...)
+}
+
+func runCLIBinaryFromBinary(t *testing.T, binaryPath string, socketPath string, args ...string) (string, string, int, error) {
+	t.Helper()
+
+	if _, err := os.Stat(binaryPath); err != nil {
+		t.Fatalf("stat cli binary %q: %v", binaryPath, err)
+	}
+
+	cmd := exec.Command(binaryPath, args...)
 	cmd.Env = append(
 		os.Environ(),
 		ipc.SocketPathEnvVar+"="+socketPath,

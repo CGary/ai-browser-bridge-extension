@@ -26,7 +26,7 @@ func TestCLI_MissingCmdFlag_ExitsWithError(t *testing.T) {
 		t.Fatalf("expected empty stdout, got %q", stdout)
 	}
 
-	if !strings.Contains(stderr, "error: -cmd flag is required") {
+	if !strings.Contains(stderr, "[ERROR] [CLI] -cmd flag is required") {
 		t.Fatalf("expected missing flag error, got %q", stderr)
 	}
 }
@@ -43,7 +43,7 @@ func TestCLI_DaemonNotRunning_ExitsWithError(t *testing.T) {
 		t.Fatalf("expected empty stdout, got %q", stdout)
 	}
 
-	if !strings.Contains(stderr, "error: could not connect to daemon at "+socketPath) {
+	if !strings.Contains(stderr, "[ERROR] [CLI] could not connect to daemon at "+socketPath) {
 		t.Fatalf("expected connection failure, got %q", stderr)
 	}
 }
@@ -118,6 +118,83 @@ func TestCLI_DaemonNotRunning_ExitCodeOne(t *testing.T) {
 	if exitCode != 1 {
 		t.Fatalf("expected exit code 1, got %d", exitCode)
 	}
+}
+
+func TestCLIOutputContract_Stdout_ContainsOnlyResponseJSON(t *testing.T) {
+	requireUnixSocketSupport(t)
+	socketPath := tempSocketPath(t)
+
+	rawResponse := []byte(`{"status":"success","result":"byte-perfect"}`)
+	_, stop := startMockDaemon(t, socketPath, rawResponse)
+	defer stop()
+
+	stdout, stderr, exitCode, err := runCLIBinaryWithBytes(t, socketPath, nil, "-cmd", "test")
+	if err != nil {
+		t.Fatalf("expected CLI success, got err=%v stderr=%q", err, stderr)
+	}
+	if exitCode != 0 {
+		t.Fatalf("expected exit code 0, got %d", exitCode)
+	}
+
+	if !bytes.Equal(stdout, rawResponse) {
+		t.Fatalf("stdout mismatch\ngot:  %q\nwant: %q", stdout, rawResponse)
+	}
+}
+
+func TestCLIOutputContract_Stdout_NoAnsiEscapes(t *testing.T) {
+	requireUnixSocketSupport(t)
+	socketPath := tempSocketPath(t)
+
+	// Payload containing characters that might trigger ANSI if handled incorrectly
+	// or just a normal response to verify the absence of ANSI sequences.
+	rawResponse := []byte(`{"status":"ok"}`)
+	_, stop := startMockDaemon(t, socketPath, rawResponse)
+	defer stop()
+
+	// Set TERM to something that usually triggers colors/ANSI in some tools
+	stdout, stderr, err := runCLI(t, socketPath, []string{"TERM=xterm-256color"}, "-cmd", "test")
+	if err != nil {
+		t.Fatalf("expected CLI success, got err=%v stderr=%q", err, stderr)
+	}
+
+	if bytes.Contains([]byte(stdout), []byte("\033[")) {
+		t.Errorf("stdout contains ANSI escape sequences: %q", stdout)
+	}
+	if bytes.Contains([]byte(stderr), []byte("\033[")) {
+		t.Errorf("stderr contains ANSI escape sequences: %q", stderr)
+	}
+}
+
+func runCLIBinaryWithBytes(t *testing.T, socketPath string, extraEnv []string, args ...string) ([]byte, string, int, error) {
+	t.Helper()
+
+	binary := buildCLIBinary(t)
+	cmd := exec.Command(binary, args...)
+	cmd.Env = append(
+		os.Environ(),
+		"CGO_ENABLED=0",
+		"GOCACHE=/tmp/go-build",
+		"GOMODCACHE=/tmp/go-mod-cache",
+		ipc.SocketPathEnvVar+"="+socketPath,
+	)
+	cmd.Env = append(cmd.Env, extraEnv...)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	exitCode := 0
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			exitCode = exitErr.ExitCode()
+		} else {
+			exitCode = -1
+		}
+	}
+	return stdout.Bytes(), stderr.String(), exitCode, err
 }
 
 func runCLI(t *testing.T, socketPath string, extraEnv []string, args ...string) (string, string, error) {

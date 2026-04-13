@@ -5,7 +5,7 @@ Tono: Técnico, analítico, formal, directo e inequívoco.
 
 <task_framework>
 <context>Se provee la documentación completa del proyecto "aibbe" en la carpeta "docs" y las tareas ya realizadas hasta el momento en la carpeta "tasks".</context>
-<objective>Desglosar algorítmicamente el "Hito 5 (M5): Pruebas End-to-End (MVP)" en un conjunto exhaustivo de tareas de desarrollo atómicas y verificables.</objective>
+<objective>Desglosar algorítmicamente el archivo "ideas/target-based-library-routing.md" en un conjunto exhaustivo de tareas de desarrollo atómicas y verificables.</objective>
 <style>Redacción técnica estandarizada, enfocada en la implementación de software.</style>
 <tone>Directivo y preciso.</tone>
 <audience>Ingenieros de software responsables de la ejecución e integración del hito.</audience>
