@@ -16,7 +16,7 @@ La arquitectura opera bajo un paradigma de almacenamiento estrictamente volátil
 
 ## 4. Diseño de Interfaces (APIs)
 * **Contrato de Datos (Daemon - Extensión):** Utiliza un esquema de tipado dinámico basado en texto (JSON). La comunicación cumple estrictamente con las especificaciones del protocolo Native Messaging: cada transmisión está precedida por un entero de 32 bits (4 bytes) en orden de bytes nativo que indica la longitud del mensaje, seguido del objeto JSON codificado en UTF-8.
-* **Contrato de Datos (CLI - Daemon):** La transferencia de instrucciones a través del socket Unix emplea el mismo esquema JSON, asegurando la interoperabilidad de las estructuras de datos y facilitando la depuración directa del flujo interno sin la sobrecarga de formatos de serialización binaria en esta iteración.
+* **Contrato de Datos (CLI - Daemon):** La transferencia de instrucciones a través del socket Unix emplea el mismo esquema JSON (ej. `{"cmd": "...", "target": "...", "payload": "..."}`), asegurando la interoperabilidad de las estructuras de datos y facilitando la depuración directa del flujo interno sin la sobrecarga de formatos de serialización binaria en esta iteración. El campo `target` permite el enrutamiento dirigido a contextos específicos.
 
 ## 5. Infraestructura y Despliegue
 El modelo de distribución se basa en la transferencia de código fuente, descartando la implementación de pipelines de integración continua (CI/CD) o empaquetado de binarios.
@@ -61,3 +61,4 @@ El código actual incluye capacidades que **no estaban en este SDD original**:
 6. **Error response pipeline** — Los errores (timeout, input not found, etc.) se propagan como objetos JSON `{ status: "error", error: "<code>" }` por el pipeline completo de respuesta, no solo via stderr. *(t15, t16)*
 
 Para detalles de implementación por cambio, consultar los archive reports en Engram bajo `sdd/{change-name}/archive-report`.
+les de implementación por cambio, consultar los archive reports en Engram bajo `sdd/{change-name}/archive-report`.

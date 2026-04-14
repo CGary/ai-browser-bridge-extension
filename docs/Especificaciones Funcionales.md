@@ -58,16 +58,20 @@
   * **Cuando** el navegador emite el evento `chrome.tabs.onRemoved` para ese `tabId` específico
   * **Entonces** el Background Script purga inmediatamente ese registro de su memoria para prevenir enrutamientos a contextos inexistentes.
 
-### User Story 2.2: Enrutamiento exclusivo de requerimientos
+### User Story 2.2: Enrutamiento exclusivo por destino (Target-based Routing)
 **Como** enrutador lógico (Background Script)
-**Quiero** direccionar el mensaje entrante del Daemon únicamente al `tabId` correspondiente al servicio demandado que se encuentre en estado "libre"
-**Para** evitar ejecuciones duplicadas y corrupción de la secuencia lógíca en múltiples pestañas activas.
+**Quiero** direccionar el mensaje entrante del Daemon únicamente al `tabId` correspondiente al servicio demandado y biblioteca específica (`target`) que se encuentre en estado "libre"
+**Para** evitar ejecuciones duplicadas, permitir el uso concurrente de múltiples bibliotecas y asegurar que la consulta se ejecute en el contexto correcto.
 
 **Criterios de Aceptación:**
-* **Escenario 1:** Enrutamiento determinista exitoso
-  * **Dado** que el Background Script recibe un requerimiento validado desde el Daemon solicitando el "Servicio X"
-  * **Cuando** consulta su registro y localiza un `tabId` asociado al "Servicio X" en estado "libre"
-  * **Entonces** cambia el estado de ese `tabId` a "ocupado", transfiere la carga útil exclusivamente a ese Content Script e ignora el resto de pestañas activas del mismo dominio.
+* **Escenario 1:** Enrutamiento determinista exitoso con destino específico
+  * **Dado** que el Background Script recibe un requerimiento validado desde el Daemon solicitando el "Servicio X" con `target` "Biblioteca Y"
+  * **Cuando** consulta su registro y localiza un `tabId` asociado al "Servicio X" y `target` "Biblioteca Y" en estado "libre"
+  * **Entonces** cambia el estado de ese `tabId` a "ocupado", transfiere la carga útil exclusivamente a ese Content Script e ignora el resto de pestañas.
+* **Escenario 2:** Enrutamiento fallido por destino inexistente
+  * **Dado** que el Background Script recibe un requerimiento con un `target` específico
+  * **Cuando** no localiza ningún `tabId` libre que coincida con ese destino
+  * **Entonces** retorna un error estructurado (`target_not_found`) hacia el Daemon sin enrutar el mensaje a ninguna pestaña.
 
 ## Épica 3: Orquestación de Interfaz y Extracción de Datos (Content Script)
 ### User Story 3.1: Inyección imperceptible de contexto técnico (RAG)

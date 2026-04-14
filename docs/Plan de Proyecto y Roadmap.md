@@ -9,6 +9,7 @@ El proyecto se ejecutará bajo un modelo de recurso único (1 FTE - Senior Softw
 * **Hito 3 (M3): Orquestador de Pestañas.** Implementación del registro de estado en memoria para el enrutamiento determinista de requerimientos hacia la interfaz web activa.
 * **Hito 4 (M4): Motor de Inyección y Extracción (RAG Local).** ~~Automatización de la inyección de contexto en el DOM objetivo y captura de la salida generada (Happy Path).~~ — ✅ **COMPLETADO**. Incluye inyección DOM (t14), extracción via MutationObserver con timeout (t15), y fortalecimiento de validaciones (t16).
 * **Hito 5 (M5): Pruebas End-to-End (MVP).** Validación transaccional completa desde la invocación en CLI hasta el retorno del código fuente autogenerado.
+* **Hito 6 (M6): Target-based Library Routing.** Capacidad de enviar comandos a bibliotecas o contextos específicos de la IA de forma dirigida, extendiendo el contrato IPC, el Content Script y la lógica de enrutamiento. *(En curso: t22, t23, t24)*
 
 ## 3. Planificación de Sprints (Backlog Mapping)
 Dada la selección de un modelo Kanban, las iteraciones se definen como lotes de trabajo secuenciales extraídos según su dependencia arquitectónica en el SDD:

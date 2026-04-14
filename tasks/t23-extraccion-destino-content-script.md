@@ -9,7 +9,7 @@ Para que el Background Script pueda enrutar mensajes a la biblioteca correcta, d
 * Contratos/Interfaces:
   * El mensaje de handshake enviado desde el content script al background script debe incluir la nueva propiedad: `{ type: "HANDSHAKE", service: "notebooklm", target: "<NombreDeLaBiblioteca>" }`.
 * Lógica de Negocio:
-  * Identificación del selector: Encontrar el selector del DOM fiable que contiene el título de la biblioteca activa en NotebookLM.
+  * Identificación del selector: Utilizar el selector CSS fiable `h1.notebook-title` para extraer el título de la biblioteca activa en NotebookLM (ej. basándose en `<h1 class="notebook-title"> SIAT Documentation </h1>`), asegurándose de limpiar espacios en blanco adicionales con `.trim()`.
   * Sincronización SPA (Inicial): Como Angular/React pueden tardar en renderizar el título, implementar un `MutationObserver` (o mecanismo de espera basado en eventos/intervalos acotados) al inicializar el script para aguardar a que el selector esté presente antes de enviar el primer `HANDSHAKE`.
   * Sincronización SPA (Navegación): Mantener un `MutationObserver` activo sobre el título o contenedor relevante. Si el usuario cambia de biblioteca sin recargar la pestaña, extraer el nuevo nombre y enviar un nuevo mensaje `HANDSHAKE` con el `target` actualizado.
 * Restricciones:

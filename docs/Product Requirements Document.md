@@ -7,6 +7,7 @@ Ingenieros de software con perfil avanzado (Web/Fullstack), situados predominant
 
 ## 3. Casos de Uso y Funcionalidades Core
 * **Orquestación Interactiva Local:** Ejecución de flujos de trabajo de forma síncrona e interactiva, desencadenada a través de una interfaz de línea de comandos (CLI) en el entorno del usuario.
+* **Enrutamiento por Contexto Específico (Target-based Routing):** Capacidad de direccionar comandos desde la CLI hacia contextos lógicos específicos (ej. bibliotecas concretas de NotebookLM) cuando existen múltiples instancias o pestañas abiertas simultáneamente.
 * **Inyección de Contexto Automatizada:** Emisión de requerimientos técnicos vía CLI que automatizan la inyección de contexto (RAG) hacia herramientas de inteligencia artificial en el navegador.
 * **Generación de Código Asistida:** Creación automatizada de código complejo (ej. integraciones de API) en el navegador mediante el control de la interfaz de usuario de agentes de inteligencia artificial.
 * **Retorno de Datos Validado:** Recuperación y entrega del código fuente generado directamente al entorno de desarrollo local para su validación inmediata por el ingeniero.
