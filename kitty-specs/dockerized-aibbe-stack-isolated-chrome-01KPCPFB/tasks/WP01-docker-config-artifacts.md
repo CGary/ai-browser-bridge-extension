@@ -15,6 +15,8 @@ subtasks:
 - T001
 - T002
 - T003
+agent: claude-code
+shell_pid: "0"
 history:
 - date: '2026-04-17T03:33:10Z'
   event: created

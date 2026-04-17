@@ -1,0 +1,59 @@
+{
+  "mission_slug": "dockerized-aibbe-stack-isolated-chrome-01KPCPFB",
+  "mission_number": "1",
+  "mission_type": "software-dev",
+  "overall_verdict": "pass",
+  "criteria": [
+    {
+      "criterion_id": "AC-001",
+      "description": "configs/aibbe.nm-host.docker.json exists with correct native host manifest structure",
+      "proof_type": "code_review",
+      "evidence": "File created at configs/aibbe.nm-host.docker.json with name, description, path, type, and allowed_origins fields",
+      "pass_fail": "pass",
+      "verified_by": "claude-code",
+      "verified_at": "2026-04-17T03:55:00Z",
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-002",
+      "description": "configs/docker/docker-compose.yml exists with volume bind for socket and profile persistence",
+      "proof_type": "code_review",
+      "evidence": "File created at configs/docker/docker-compose.yml with socket volume bind and Chrome profile volume",
+      "pass_fail": "pass",
+      "verified_by": "claude-code",
+      "verified_at": "2026-04-17T03:55:00Z",
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-003",
+      "description": "Manifest path in aibbe.nm-host.docker.json is consistent with compose volume bind",
+      "proof_type": "code_review",
+      "evidence": "Cross-validated: manifest path and compose volume bind reference the same container binary path",
+      "pass_fail": "pass",
+      "verified_by": "claude-code",
+      "verified_at": "2026-04-17T03:55:00Z",
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-004",
+      "description": "docs/quickstart-docker.md exists with complete 12-step setup guide",
+      "proof_type": "code_review",
+      "evidence": "File created at docs/quickstart-docker.md with all required setup steps for containerized aibbe stack",
+      "pass_fail": "pass",
+      "verified_by": "claude-code",
+      "verified_at": "2026-04-17T03:55:00Z",
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-005",
+      "description": "All paths and commands in quickstart-docker.md match WP01 artifacts",
+      "proof_type": "code_review",
+      "evidence": "Verified paths in docs/quickstart-docker.md are consistent with configs/aibbe.nm-host.docker.json and configs/docker/docker-compose.yml",
+      "pass_fail": "pass",
+      "verified_by": "claude-code",
+      "verified_at": "2026-04-17T03:55:00Z",
+      "notes": null
+    }
+  ],
+  "negative_invariants": []
+}

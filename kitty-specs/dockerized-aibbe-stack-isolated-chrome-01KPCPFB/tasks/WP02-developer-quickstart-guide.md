@@ -17,6 +17,8 @@ branch_strategy: Planning artifacts for this feature were generated on main. Dur
 subtasks:
 - T004
 - T005
+agent: claude-code
+shell_pid: "0"
 history:
 - date: '2026-04-17T03:33:10Z'
   event: created
