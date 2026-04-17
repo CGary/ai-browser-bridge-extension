@@ -1,8 +1,8 @@
 {
-  "event_count": 2,
-  "last_event_id": "01KPCR5N39MF4SV8RG6J4TD01Y",
-  "materialized_at": "2026-04-17T03:36:21.353454+00:00",
-  "mission_number": "",
+  "event_count": 3,
+  "last_event_id": "01KPCS7X84NY1FXS4KB3HRKWCF",
+  "materialized_at": "2026-04-17T03:55:03.812395+00:00",
+  "mission_number": "1",
   "mission_slug": "dockerized-aibbe-stack-isolated-chrome-01KPCPFB",
   "mission_type": "software-dev",
   "summary": {
@@ -10,19 +10,19 @@
     "blocked": 0,
     "canceled": 0,
     "claimed": 0,
-    "done": 0,
+    "done": 1,
     "for_review": 0,
     "in_progress": 0,
     "in_review": 0,
-    "planned": 2
+    "planned": 1
   },
   "work_packages": {
     "WP01": {
-      "actor": "finalize-tasks",
-      "force_count": 1,
-      "lane": "planned",
-      "last_event_id": "01KPCR5N1GAVYDHGR9MN9FCJ6J",
-      "last_transition_at": "2026-04-17T03:36:21.296977+00:00"
+      "actor": "user",
+      "force_count": 2,
+      "lane": "done",
+      "last_event_id": "01KPCS7X84NY1FXS4KB3HRKWCF",
+      "last_transition_at": "2026-04-17T03:55:03.812395+00:00"
     },
     "WP02": {
       "actor": "finalize-tasks",

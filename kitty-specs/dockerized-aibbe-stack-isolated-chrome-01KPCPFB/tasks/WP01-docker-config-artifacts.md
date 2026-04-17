@@ -296,3 +296,7 @@ volumes:
 1. Validate the manifest JSON against the Chrome Native Messaging spec — specifically that `type` is `"stdio"` and `allowed_origins` uses the correct extension ID.
 2. Run `docker compose -f configs/docker/docker-compose.yml config` (without `--quiet`) to see the fully-interpolated compose output and spot any path issues.
 3. Verify the manifest volume bind resolves correctly: `configs/docker/../aibbe.nm-host.docker.json` == `configs/aibbe.nm-host.docker.json`.
+
+## Activity Log
+
+- 2026-04-17T03:55:03Z – unknown – Force: merged to main at ea38ee3, implementation commits 34b39bb and b03f11f
