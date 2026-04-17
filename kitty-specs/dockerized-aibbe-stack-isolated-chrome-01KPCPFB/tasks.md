@@ -19,11 +19,11 @@ configuration, and a developer quickstart guide.
 
 | ID | Description | WP | Parallel |
 |---|---|---|---|
-| T001 | Create `configs/aibbe.nm-host.docker.json` — Docker native host manifest | WP01 | [P] |
-| T002 | Create `configs/docker/docker-compose.yml` — Container configuration | WP01 | [P] |
-| T003 | Cross-validate manifest `path` and compose volume bind are consistent | WP01 | — |
-| T004 | Create `docs/quickstart-docker.md` — 12-step setup guide | WP02 | — |
-| T005 | Verify all paths and commands in the guide match the WP01 artifacts | WP02 | — |
+| T001 | Create `configs/aibbe.nm-host.docker.json` — Docker native host manifest | WP01 | [P] | [D] |
+| T002 | Create `configs/docker/docker-compose.yml` — Container configuration | WP01 | [D] |
+| T003 | Cross-validate manifest `path` and compose volume bind are consistent | WP01 | — | [D] |
+| T004 | Create `docs/quickstart-docker.md` — 12-step setup guide | WP02 | — | [D] |
+| T005 | Verify all paths and commands in the guide match the WP01 artifacts | WP02 | — | [D] |
 
 ---
 
@@ -41,9 +41,9 @@ configuration, and a developer quickstart guide.
 
 **Included subtasks**:
 
-- [ ] T001 Create `configs/aibbe.nm-host.docker.json` — Docker native host manifest (WP01)
-- [ ] T002 Create `configs/docker/docker-compose.yml` — Container configuration (WP01)
-- [ ] T003 Cross-validate manifest `path` and compose volume bind are consistent (WP01)
+- [x] T001 Create `configs/aibbe.nm-host.docker.json` — Docker native host manifest (WP01)
+- [x] T002 Create `configs/docker/docker-compose.yml` — Container configuration (WP01)
+- [x] T003 Cross-validate manifest `path` and compose volume bind are consistent (WP01)
 
 **Implementation sketch**:
 1. Copy the existing `configs/aibbe.nm-host.json` structure; change only `path` to `/app/aibbe-daemon`.
@@ -68,8 +68,8 @@ configuration, and a developer quickstart guide.
 
 **Included subtasks**:
 
-- [ ] T004 Create `docs/quickstart-docker.md` — 12-step setup guide (WP02)
-- [ ] T005 Verify all paths and commands in the guide match the WP01 artifacts (WP02)
+- [x] T004 Create `docs/quickstart-docker.md` — 12-step setup guide (WP02)
+- [x] T005 Verify all paths and commands in the guide match the WP01 artifacts (WP02)
 
 **Implementation sketch**:
 1. Follow the 12-step outline defined in `plan.md` § Work Area 3.
