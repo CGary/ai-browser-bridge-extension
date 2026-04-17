@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "mission_slug": "dockerized-aibbe-stack-isolated-chrome-01KPCPFB",
+  "mission_id": "01KPCPFBPV1Y8QBSW7GP0PQ5XM",
+  "mission_branch": "kitty/mission-dockerized-aibbe-stack-isolated-chrome-01KPCPFB",
+  "target_branch": "main",
+  "lanes": [
+    {
+      "lane_id": "lane-a",
+      "wp_ids": [
+        "WP01",
+        "WP02"
+      ],
+      "write_scope": [
+        "configs/aibbe.nm-host.docker.json",
+        "configs/docker/",
+        "configs/docker/docker-compose.yml",
+        "docs/quickstart-docker.md"
+      ],
+      "predicted_surfaces": [
+        "api",
+        "app-shell",
+        "artifact-rendering",
+        "legacy-cleanup"
+      ],
+      "depends_on_lanes": [],
+      "parallel_group": 0
+    }
+  ],
+  "computed_at": "2026-04-17T03:36:21.359912+00:00",
+  "computed_from": "dependency_graph+ownership",
+  "planning_artifact_wps": [],
+  "collapse_report": {
+    "events": [
+      {
+        "wp_a": "WP02",
+        "wp_b": "WP01",
+        "rule": "dependency",
+        "evidence": "WP02 depends on WP01"
+      }
+    ],
+    "total_merges": 1,
+    "independent_wps_collapsed": 0,
+    "by_rule": {
+      "dependency": 1
+    }
+  }
+}
