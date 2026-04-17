@@ -1,0 +1,36 @@
+# Docker Compose configuration for the containerized aibbe stack.
+#
+# BEFORE RUNNING:
+#   1. Replace PUID and PGID with your host UID/GID:
+#        PUID=$(id -u)   PGID=$(id -g)
+#   2. Replace the daemon binary volume source with the absolute path to your
+#      compiled aibbe-daemon binary:
+#        go build -o ~/bin/aibbe-daemon ./daemon/
+#      Then set: /home/<you>/bin/aibbe-daemon:/app/aibbe-daemon:ro
+#
+# START:    docker compose -f configs/docker/docker-compose.yml up -d
+# STOP:     docker compose -f configs/docker/docker-compose.yml down
+# BROWSER:  http://localhost:3000
+
+services:
+  chrome:
+    image: linuxserver/chrome:latest
+    environment:
+      - PUID=1000    # Replace with: $(id -u)
+      - PGID=1000    # Replace with: $(id -g)
+      - AIBBE_SOCKET_PATH=/run/aibbe/aibbe.sock
+    ports:
+      - "3000:3000"
+    shm_size: "1gb"
+    security_opt:
+      - seccomp:unconfined
+    restart: unless-stopped
+    volumes:
+      - /REPLACE/WITH/ABSOLUTE/PATH/TO/aibbe-daemon:/app/aibbe-daemon:ro
+      - ../../extension:/config/extensions/aibbe:ro
+      - ../aibbe.nm-host.docker.json:/config/.config/chromium/NativeMessagingHosts/aibbe.json:ro
+      - /tmp/aibbe-docker-socket:/run/aibbe:rw
+      - aibbe-chrome-profile:/config:rw
+
+volumes:
+  aibbe-chrome-profile:

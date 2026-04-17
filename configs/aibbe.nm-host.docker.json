@@ -1,0 +1,9 @@
+{
+  "name": "aibbe",
+  "description": "AI Browser Bridge Extension Host",
+  "path": "/app/aibbe-daemon",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://bedlojjaiogmaefoadfpdecgajipcpgj/"
+  ]
+}
