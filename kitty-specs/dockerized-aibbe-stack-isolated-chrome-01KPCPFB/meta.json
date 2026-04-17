@@ -1,10 +1,12 @@
 {
   "created_at": "2026-04-17T03:06:42.277834+00:00",
-  "friendly_name": "dockerized aibbe stack isolated chrome",
+  "friendly_name": "Dockerized aibbe Stack with Isolated Chrome Account",
   "mission_id": "01KPCPFBPV1Y8QBSW7GP0PQ5XM",
   "mission_number": null,
   "mission_slug": "dockerized-aibbe-stack-isolated-chrome-01KPCPFB",
   "mission_type": "software-dev",
   "slug": "dockerized-aibbe-stack-isolated-chrome-01KPCPFB",
-  "target_branch": "main"
+  "target_branch": "main",
+  "vcs": "git",
+  "source_description": "Run the full aibbe stack (Chrome + Extension + Daemon) inside a linuxserver/chrome Docker container with a separate Google account to bypass the NotebookLM bot-detection block. Host CLI connects to containerized daemon via Unix socket mounted through a Docker volume."
 }
