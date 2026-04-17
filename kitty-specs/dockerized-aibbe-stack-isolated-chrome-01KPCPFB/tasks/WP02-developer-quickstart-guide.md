@@ -339,3 +339,7 @@ Explain:
 2. Verify the CLI command in Step 10 produces the expected output given the echo behavior of the current extension.
 3. Check the troubleshooting table covers scenarios 2, 3, and 5 from the spec (`spec.md`).
 4. Confirm the guide is self-contained — no external links or assumed knowledge beyond what's listed in Prerequisites.
+
+## Activity Log
+
+- 2026-04-17T03:55:04Z – unknown – Force: merged to main at ea38ee3
