@@ -1,108 +1,187 @@
-# Implementation Plan: [FEATURE]
-*Path: [templates/plan-template.md](templates/plan-template.md)*
+# Implementation Plan: Dockerized aibbe Stack with Isolated Chrome Account
 
+**Mission**: dockerized-aibbe-stack-isolated-chrome-01KPCPFB  
+**Mission ID**: 01KPCPFBPV1Y8QBSW7GP0PQ5XM  
+**Branch**: `main` → merge target: `main`  
+**Date**: 2026-04-17  
+**Spec**: [spec.md](spec.md)
 
-**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
-**Input**: Feature specification from `/kitty-specs/[###-feature-name]/spec.md`
-
-**Note**: This template is filled in by the `/spec-kitty.plan` command. See `src/specify_cli/missions/software-dev/command-templates/plan.md` for the execution workflow.
-
-The planner will not begin until all planning questions have been answered—capture those answers in this document before progressing to later phases.
+---
 
 ## Summary
 
-[Extract from feature spec: primary requirement + technical approach from research]
+Run the full aibbe stack (daemon + extension) inside a `linuxserver/chrome` Docker container using a fresh Google account. The daemon binary is volume-mounted from the host (read-only). Chrome launches it via Native Messaging using a Docker-specific manifest. The daemon creates a Unix socket inside the container into a bind-mounted directory, making it accessible to the host CLI through `AIBBE_SOCKET_PATH`. No source code changes are required — all work is configuration and documentation.
+
+---
 
 ## Technical Context
 
-<!--
-  ACTION REQUIRED: Replace the content in this section with the technical details
-  for the project. The structure here is presented in advisory capacity to guide
-  the iteration process.
--->
+**Language/Version**: Go 1.21 (daemon, pre-compiled on host); JavaScript MV3 (extension, no changes)  
+**Primary Dependencies**: `linuxserver/chrome` Docker image; Docker Compose v2  
+**Storage**: Named Docker volume for Chrome profile persistence  
+**Testing**: Manual end-to-end verification (CLI round-trip); no new Go tests (no source changes)  
+**Target Platform**: Debian 12 host + `linuxserver/chrome` container (Linux amd64)  
+**Performance Goals**: CLI round-trip under 2 seconds (unchanged from charter)  
+**Constraints**: Socket permissions 0600, PUID must equal host user UID, operational cost $0
 
-**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]  
-**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
-**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]  
-**Testing**: [Project-specific test approach or NEEDS CLARIFICATION]
-**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
-**Project Type**: [single/web/mobile - determines source structure]  
-**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]  
-**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]  
-**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
+---
 
 ## Charter Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+| Constraint | Status | Notes |
+|---|---|---|
+| Socket permissions 0600 | PASS | Daemon creates socket with 0600; PUID alignment grants host CLI access without relaxing permissions |
+| Fail-Fast — no retries | PASS | No changes to daemon or CLI behaviour |
+| Operational cost $0 | PASS | `linuxserver/chrome` is free; no paid services added |
+| No backwards-compat shims | PASS | Docker config is purely additive; existing host setup unchanged |
+| Conventional commits | REQUIRED | All commits in this feature must follow conventional commit format |
+| go vet clean | N/A | No Go source changes |
 
-[Gates determined based on charter file]
+---
 
 ## Project Structure
 
 ### Documentation (this feature)
 
 ```
-kitty-specs/[###-feature]/
-├── plan.md              # This file (/spec-kitty.plan command output)
-├── research.md          # Phase 0 output (/spec-kitty.plan command)
-├── data-model.md        # Phase 1 output (/spec-kitty.plan command)
-├── quickstart.md        # Phase 1 output (/spec-kitty.plan command)
-├── contracts/           # Phase 1 output (/spec-kitty.plan command)
-└── tasks.md             # Phase 2 output (/spec-kitty.tasks command - NOT created by /spec-kitty.plan)
+kitty-specs/dockerized-aibbe-stack-isolated-chrome-01KPCPFB/
+├── spec.md
+├── plan.md              ← this file
+├── research.md          ← Phase 0 complete
+├── quickstart.md        ← Phase 1 output
+└── tasks/
 ```
 
-### Source Code (repository root)
-<!--
-  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
-  for this feature. Delete unused options and expand the chosen structure with
-  real paths (e.g., apps/admin, packages/something). The delivered plan must
-  not include Option labels.
--->
+### Source Code (new files in repo root)
 
 ```
-# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
-src/
-├── models/
-├── services/
-├── cli/
-└── lib/
+configs/
+├── aibbe.nm-host.json            ← existing (host setup, unchanged)
+├── aibbe.nm-host.docker.json     ← NEW: Docker-specific native host manifest
+└── docker/
+    └── docker-compose.yml        ← NEW: Container configuration
 
-tests/
-├── contract/
-├── integration/
-└── unit/
-
-# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
-backend/
-├── src/
-│   ├── models/
-│   ├── services/
-│   └── api/
-└── tests/
-
-frontend/
-├── src/
-│   ├── components/
-│   ├── pages/
-│   └── services/
-└── tests/
-
-# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
-api/
-└── [same as backend above]
-
-ios/ or android/
-└── [platform-specific structure: feature modules, UI flows, platform tests]
+docs/
+└── quickstart-docker.md          ← NEW: Setup guide for containerised stack
 ```
 
-**Structure Decision**: [Document the selected structure and reference the real
-directories captured above]
+---
 
-## Complexity Tracking
+## Phase 0: Research (Complete)
 
-*Fill ONLY if Charter Check has violations that must be justified*
+See `research.md`. All unknowns resolved:
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
-| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
+| Question | Decision |
+|---|---|
+| linuxserver/chrome filesystem layout | Chrome profile at `/config/.config/chromium/`; NativeMessagingHosts at `/config/.config/chromium/NativeMessagingHosts/` |
+| Daemon delivery strategy | Volume-mount host binary at `/app/aibbe-daemon` (read-only) |
+| Socket cross-container strategy | Bind-mount dedicated host dir `/tmp/aibbe-docker-socket/` → container `/run/aibbe/`; set `AIBBE_SOCKET_PATH=/run/aibbe/aibbe.sock` in container |
+| UID alignment | Set `PUID`=host UID, `PGID`=host GID in docker-compose.yml |
+| Extension loading | Volume-mount `./extension/` → `/config/extensions/aibbe/`; load via Chrome "Load unpacked" (one-time) |
+| Source code changes | None required |
+
+---
+
+## Phase 1: Design & Artifacts
+
+### Work Area 1 — Docker Native Host Manifest
+
+**File**: `configs/aibbe.nm-host.docker.json`
+
+Variant of the existing `configs/aibbe.nm-host.json`. Only difference: `path` field set to `/app/aibbe-daemon` (container-internal binary location). All other fields (`name`, `description`, `type`, `allowed_origins`) identical to the host manifest.
+
+This file is volume-mounted into the container at:
+`/config/.config/chromium/NativeMessagingHosts/aibbe.json`
+
+**Acceptance criteria**:
+- File is valid JSON
+- `name` is `aibbe`
+- `path` is `/app/aibbe-daemon`
+- `type` is `stdio`
+- `allowed_origins` matches the extension ID `bedlojjaiogmaefoadfpdecgajipcpgj`
+
+---
+
+### Work Area 2 — Docker Compose Configuration
+
+**File**: `configs/docker/docker-compose.yml`
+
+Defines a single `chrome` service:
+
+| Parameter | Value |
+|---|---|
+| Image | `linuxserver/chrome:latest` |
+| `PUID` | `<host-uid>` (documented placeholder — engineer sets `id -u`) |
+| `PGID` | `<host-gid>` (documented placeholder — engineer sets `id -g`) |
+| `AIBBE_SOCKET_PATH` | `/run/aibbe/aibbe.sock` |
+| Port | `3000:3000` (KasmVNC web UI) |
+| `shm_size` | `1gb` |
+| `security_opt` | `seccomp:unconfined` |
+| `restart` | `unless-stopped` |
+
+**Volume mounts**:
+
+| Host path | Container path | Mode |
+|---|---|---|
+| `<absolute-path-to-binary>` | `/app/aibbe-daemon` | `ro` |
+| `../../extension` (relative to compose file) | `/config/extensions/aibbe` | `ro` |
+| `./aibbe.nm-host.docker.json` (relative to compose file) | `/config/.config/chromium/NativeMessagingHosts/aibbe.json` | `ro` |
+| `/tmp/aibbe-docker-socket` | `/run/aibbe` | `rw` |
+| `aibbe-chrome-profile` (named volume) | `/config` | `rw` |
+
+**Named volumes declaration**: `aibbe-chrome-profile` (Docker-managed persistence for Chrome profile).
+
+**Acceptance criteria**:
+- `docker compose -f configs/docker/docker-compose.yml up -d` starts without error
+- Chrome accessible at `http://localhost:3000`
+- `/tmp/aibbe-docker-socket/` directory exists on host after container start
+
+---
+
+### Work Area 3 — Setup Guide
+
+**File**: `docs/quickstart-docker.md`
+
+Step-by-step guide for the engineer:
+
+1. **Prerequisites**: Docker installed, daemon binary compiled (`go build -o ./bin/aibbe-daemon ./daemon/`)
+2. **Find host UID/GID**: `id -u` and `id -g`
+3. **Edit docker-compose.yml**: Set `PUID`, `PGID`, and absolute binary path volume
+4. **Create socket directory**: `mkdir -p /tmp/aibbe-docker-socket`
+5. **Start container**: `docker compose -f configs/docker/docker-compose.yml up -d`
+6. **Access Chrome**: Open `http://localhost:3000`
+7. **Log in**: Sign into the isolated Google account
+8. **Load extension**: `chrome://extensions` → Developer Mode → Load unpacked → `/config/extensions/aibbe`
+9. **Verify extension**: Check background service worker console for no errors
+10. **Test CLI**: `AIBBE_SOCKET_PATH=/tmp/aibbe-docker-socket/aibbe.sock go run cmd/cli/main.go -cmd ping`
+11. **Stopping**: `docker compose -f configs/docker/docker-compose.yml down` (profile preserved in named volume)
+12. **Updating daemon**: Recompile on host → container picks up new binary automatically (volume mount)
+
+**Acceptance criteria**:
+- Engineer completes setup and achieves a successful CLI round-trip in one session
+
+---
+
+## Risks & Mitigations
+
+| Risk | Likelihood | Mitigation |
+|---|---|---|
+| UID mismatch breaks socket access | High if misconfigured | Setup guide covers `id -u`/`id -g` explicitly; docker-compose.yml uses labelled placeholders |
+| Chrome sandbox incompatibility | Medium | `seccomp:unconfined` + `--no-sandbox` documented for linuxserver/chrome |
+| Extension load fails (security policy) | Low | Developer Mode supported by linuxserver/chrome |
+| Named volume removed accidentally | Low | Guide warns; volume name is explicit and distinct |
+| Binary architecture mismatch | Low | Guide covers `GOOS=linux GOARCH=amd64 go build` cross-compile step |
+
+---
+
+## Branch Contract (Final)
+
+- **Branch at plan start**: `main`
+- **Planning base**: `main`
+- **Merge target**: `main`
+
+---
+
+## Next Step
+
+Run `/spec-kitty.tasks` to generate work packages from this plan.
