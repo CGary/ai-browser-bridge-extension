@@ -1,5 +1,5 @@
 {
-  "accept_commit": "ebb00f10308c9baae70dcaca66210c483dda59b5",
+  "accept_commit": "331ebebb838d0dbbb56861b72766f55cd9d08c3f",
   "acceptance_history": [
     {
       "accept_commit": "9367a6d73f959e5fdd79dce4bdc3f2ebccf880cc",
@@ -14,12 +14,19 @@
       "accepted_at": "2026-04-18T16:51:16.885892+00:00",
       "accepted_by": "gary",
       "accepted_from_commit": "0258e8a5cfb14005fc904003a1803eb19ddeff2a"
+    },
+    {
+      "accept_commit": "331ebebb838d0dbbb56861b72766f55cd9d08c3f",
+      "acceptance_mode": "pr",
+      "accepted_at": "2026-04-18T17:02:33.092365+00:00",
+      "accepted_by": "gary",
+      "accepted_from_commit": "089834a56e7d02d25581dfdea225b7ff5a3ae706"
     }
   ],
   "acceptance_mode": "pr",
-  "accepted_at": "2026-04-18T16:51:16.885892+00:00",
+  "accepted_at": "2026-04-18T17:02:33.092365+00:00",
   "accepted_by": "gary",
-  "accepted_from_commit": "0258e8a5cfb14005fc904003a1803eb19ddeff2a",
+  "accepted_from_commit": "089834a56e7d02d25581dfdea225b7ff5a3ae706",
   "created_at": "2026-04-18T12:52:37.186943+00:00",
   "friendly_name": "Humanización DOM con Jitter Anti-Bot",
   "mission_id": "01KPGACXBHV42ATCXGJ9CQDWBG",
