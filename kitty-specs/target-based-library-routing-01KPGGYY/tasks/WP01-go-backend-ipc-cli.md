@@ -303,3 +303,4 @@ spec-kitty agent action implement WP01 --agent <name>
 - 2026-04-18T18:35:25Z – gemini – shell_pid=384933 – Assigned agent via action command
 - 2026-04-18T18:37:31Z – gemini – shell_pid=384933 – Ready for review
 - 2026-04-18T18:43:27Z – gemini – shell_pid=403805 – Started review via action command
+- 2026-04-18T18:43:35Z – gemini – shell_pid=403805 – Review passed: IPC contract extended with target (omitempty), CLI flag added, and daemon logs updated. Tests confirm backward compatibility.
