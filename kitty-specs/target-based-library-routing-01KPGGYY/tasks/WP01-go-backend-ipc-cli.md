@@ -19,7 +19,8 @@ subtasks:
 - T003
 - T004
 - T005
-shell_pid: '384933'
+shell_pid: "384933"
+agent: "gemini"
 history:
 - date: '2026-04-18'
   event: created
@@ -296,3 +297,7 @@ spec-kitty agent action implement WP01 --agent <name>
 - Confirm `omitempty` is present in the struct tag — the absence is a silent correctness bug
 - Confirm CLI tests cover both the with-target and without-target paths
 - Confirm daemon routing code has no new logic (only log update)
+
+## Activity Log
+
+- 2026-04-18T18:35:25Z – gemini – shell_pid=384933 – Assigned agent via action command
