@@ -1,0 +1,99 @@
+{
+  "mission_slug": "humanizacion-dom-jitter-anti-bot-01KPGACX",
+  "mission_number": "2",
+  "mission_type": "software-dev",
+  "overall_verdict": "fail",
+  "criteria": [
+    {
+      "criterion_id": "AC-001",
+      "description": "typeWithJitter existe en content.js e inserta texto caracter-por-caracter (FR-001, FR-008)",
+      "proof_type": "automated_test",
+      "evidence": "go test ./... -run TestExtensionContent_HumanTyping_InsertsCharsOneByOne",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-002",
+      "description": "KeyboardEvent (keydown, keypress, keyup) despachado por caracter en orden (FR-002)",
+      "proof_type": "automated_test",
+      "evidence": "go test ./... -run TestExtensionContent_HumanTyping_DispatchesKeyboardEventsPerChar",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-003",
+      "description": "injectAndSubmit usa typeWithJitter cuando __AIBBE_HUMAN_TYPING es true (FR-003)",
+      "proof_type": "automated_test",
+      "evidence": "go test ./... -run TestExtensionContent_HumanTyping",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-004",
+      "description": "Delay pre-submit ocurre ANTES del click cuando humanizaci\u00f3n est\u00e1 activa (FR-004)",
+      "proof_type": "automated_test",
+      "evidence": "go test ./... -run TestExtensionContent_HumanTyping_SleepsBeforeSubmit",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-005",
+      "description": "Path execCommand de setInputValue cubierto por tests (FR-005)",
+      "proof_type": "automated_test",
+      "evidence": "go test ./... -run TestExtensionContent_SetInputValue_ExecCommandPath",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-006",
+      "description": "Path contenteditable de setInputValue cubierto por tests (FR-006)",
+      "proof_type": "automated_test",
+      "evidence": "go test ./... -run TestExtensionContent_SetInputValue_ContenteditablePath",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-007",
+      "description": "Tests de humanizaci\u00f3n usan __AIBBE_JITTER_RANGE:[0,0] para determinismo (FR-007)",
+      "proof_type": "code_review",
+      "evidence": "Harness de WP02 usa __AIBBE_JITTER_RANGE:[0,0] en todos los tests de humanizaci\u00f3n",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-008",
+      "description": "go test ./... pasa al 100% incluyendo todos los tests existentes (NFR-004)",
+      "proof_type": "automated_test",
+      "evidence": "go test ./...",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-009",
+      "description": "Con __AIBBE_HUMAN_TYPING false/no definido, comportamiento existente intacto (NFR-001)",
+      "proof_type": "automated_test",
+      "evidence": "go test ./... -run TestExtensionContent_HumanTyping_DisabledPreservesExistingBehavior",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    }
+  ],
+  "negative_invariants": []
+}
