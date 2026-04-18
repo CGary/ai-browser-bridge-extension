@@ -1,16 +1,16 @@
 {
-  "event_count": 16,
-  "last_event_id": "01KPGYKP5CJ6RSAFVFJNWMKB44",
-  "materialized_at": "2026-04-18T18:45:50.380715+00:00",
+  "event_count": 18,
+  "last_event_id": "01KPHBQ8FHEK9S6970B7EZ7J93",
+  "materialized_at": "2026-04-18T22:34:58.929034+00:00",
   "mission_number": "",
   "mission_slug": "target-based-library-routing-01KPGGYY",
   "mission_type": "software-dev",
   "summary": {
-    "approved": 2,
+    "approved": 0,
     "blocked": 0,
     "canceled": 0,
     "claimed": 0,
-    "done": 0,
+    "done": 2,
     "for_review": 0,
     "in_progress": 0,
     "in_review": 0,
@@ -18,18 +18,18 @@
   },
   "work_packages": {
     "WP01": {
-      "actor": "user",
-      "force_count": 2,
-      "lane": "approved",
-      "last_event_id": "01KPGYFJPR44JCPR441V9D86K6",
-      "last_transition_at": "2026-04-18T18:43:35.768310+00:00"
+      "actor": "gemini",
+      "force_count": 3,
+      "lane": "done",
+      "last_event_id": "01KPHBQ82EEPE6DXGTWBGGVQ2B",
+      "last_transition_at": "2026-04-18T22:34:58.510599+00:00"
     },
     "WP02": {
-      "actor": "user",
-      "force_count": 2,
-      "lane": "approved",
-      "last_event_id": "01KPGYKP5CJ6RSAFVFJNWMKB44",
-      "last_transition_at": "2026-04-18T18:45:50.380715+00:00"
+      "actor": "gemini",
+      "force_count": 3,
+      "lane": "done",
+      "last_event_id": "01KPHBQ8FHEK9S6970B7EZ7J93",
+      "last_transition_at": "2026-04-18T22:34:58.929034+00:00"
     }
   }
 }
