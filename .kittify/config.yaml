@@ -1,0 +1,13 @@
+vcs:
+  type: git
+agents:
+  available:
+  - claude
+  - codex
+  - gemini
+  auto_commit: true
+project:
+  uuid: 1ff46e4f-3b18-4b7d-a46b-370f0342c4a0
+  slug: ai-browser-bridge-extension
+  node_id: b7c77a915371
+  build_id: d756739a-2794-4c23-a0be-ec8c3900150c

@@ -11,11 +11,15 @@ requirement_refs:
 planning_base_branch: main
 merge_target_branch: main
 branch_strategy: Planning artifacts for this feature were generated on main. During /spec-kitty.implement this WP may branch from a dependency-specific base, but completed changes must merge back into main unless the human explicitly redirects the landing branch.
+base_branch: kitty/mission-humanizacion-dom-jitter-anti-bot-01KPGACX
+base_commit: 4bfd87eb8dc2d41736fc6a1795d330debc3b25a3
+created_at: '2026-04-18T14:56:27.575535+00:00'
 subtasks:
 - T003
 - T004
 - T005
 - T006
+shell_pid: '145423'
 history:
 - date: '2026-04-18'
   event: created
