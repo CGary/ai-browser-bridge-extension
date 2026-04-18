@@ -13,12 +13,67 @@ const SELECTORS = {
   CODE_BLOCK: 'code, pre',
 };
 
-chrome.runtime.sendMessage({
-  type: "HANDSHAKE",
-  service: "notebooklm",
-});
+const TITLE_SELECTOR = "div.cover-title";
+const HANDSHAKE_TIMEOUT_MS = 5000;
 
-console.log("[aibbe] Handshake sent for notebooklm");
+function sendHandshake(target) {
+  chrome.runtime.sendMessage({
+    type: "HANDSHAKE",
+    service: "notebooklm",
+    target,
+  });
+  console.log(`[aibbe] Handshake sent: target=${target}`);
+}
+
+function watchLibraryTitle(titleElement) {
+  const navObserver = new MutationObserver(() => {
+    const text = titleElement.textContent?.trim();
+    if (text) {
+      sendHandshake(text);
+    } else {
+      navObserver.disconnect();
+      waitForLibraryTitle();
+    }
+  });
+
+  navObserver.observe(titleElement, {
+    childList: true,
+    characterData: true,
+    subtree: true,
+  });
+}
+
+function waitForLibraryTitle() {
+  const existing = document.querySelector(TITLE_SELECTOR);
+  const existingText = existing?.textContent?.trim();
+  if (existingText) {
+    sendHandshake(existingText);
+    watchLibraryTitle(existing);
+    return;
+  }
+
+  const timeoutId = setTimeout(() => {
+    observer.disconnect();
+    console.warn("[aibbe] Timed out waiting for library title — HANDSHAKE not sent");
+  }, HANDSHAKE_TIMEOUT_MS);
+
+  const observer = new MutationObserver(() => {
+    const el = document.querySelector(TITLE_SELECTOR);
+    const text = el?.textContent?.trim();
+    if (!text) return;
+
+    clearTimeout(timeoutId);
+    observer.disconnect();
+    sendHandshake(text);
+    watchLibraryTitle(el);
+  });
+
+  observer.observe(document.body, { childList: true, subtree: true });
+}
+
+if (typeof document !== "undefined" && typeof MutationObserver !== "undefined") {
+  waitForLibraryTitle();
+}
 
 function waitForNextFrame() {
   return new Promise((resolve) => requestAnimationFrame(resolve));

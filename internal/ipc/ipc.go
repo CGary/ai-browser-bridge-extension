@@ -11,6 +11,7 @@ const MaxRequestSize = 1 << 20
 // Request represents a CLI-to-daemon IPC request.
 type Request struct {
 	Cmd     string `json:"cmd"`
+	Target  string `json:"target,omitempty"`
 	Payload string `json:"payload"`
 }
 

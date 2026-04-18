@@ -1,6 +1,8 @@
 ---
 work_package_id: WP01
 title: 'Go Backend: IPC + CLI + Daemon'
+agent: gemini
+shell_pid: 0
 dependencies: []
 requirement_refs:
 - FR-001

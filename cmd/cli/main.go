@@ -14,6 +14,7 @@ import (
 func main() {
 	socketPath := ipc.SocketPathForProcess()
 	cmd := flag.String("cmd", "", "command identifier (required)")
+	target := flag.String("target", "", "target library name (optional, defaults to first free tab)")
 	payload := flag.String("payload", "", "associated data (optional)")
 	flag.Parse()
 
@@ -21,7 +22,11 @@ func main() {
 		exitWithError("-cmd flag is required")
 	}
 
-	data, err := json.Marshal(ipc.Request{Cmd: *cmd, Payload: *payload})
+	data, err := json.Marshal(ipc.Request{
+		Cmd:     *cmd,
+		Target:  *target,
+		Payload: *payload,
+	})
 	if err != nil {
 		exitWithError(fmt.Sprintf("failed to encode request: %v", err))
 	}

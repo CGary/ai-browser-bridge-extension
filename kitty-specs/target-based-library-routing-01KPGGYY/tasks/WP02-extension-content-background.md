@@ -1,6 +1,8 @@
 ---
 work_package_id: WP02
 title: 'Chrome Extension: Content Script + Background Script'
+agent: gemini
+shell_pid: 0
 dependencies: []
 requirement_refs:
 - FR-005
