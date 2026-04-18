@@ -157,7 +157,7 @@ function setInputValue(inputElement, payload) {
 
   // Fallback for non-Angular environments (e.g. test harness, plain textareas).
   const nativeSetter = Object.getOwnPropertyDescriptor(
-    window.HTMLTextAreaElement.prototype,
+    window.HTMLTextAreaElement?.prototype,
     "value",
   )?.set;
 
