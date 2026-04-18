@@ -2,7 +2,7 @@
   "event_count": 15,
   "last_event_id": "01KPGJH69Y0TX39G0M2C9Z0EXB",
   "materialized_at": "2026-04-18T15:14:45.694674+00:00",
-  "mission_number": "",
+  "mission_number": "2",
   "mission_slug": "humanizacion-dom-jitter-anti-bot-01KPGACX",
   "mission_type": "software-dev",
   "summary": {
