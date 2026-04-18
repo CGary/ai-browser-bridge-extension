@@ -15,12 +15,12 @@
 | T004 | Agregar `randomBetween(min, max)` helper a `content.js` | WP01 | [D] |
 | T005 | Implementar `typeWithJitter(element, text, range)` async function | WP01 | — | [D] |
 | T006 | Modificar `injectAndSubmit`: check `__AIBBE_HUMAN_TYPING`, branch humanizado | WP01 | — | [D] |
-| T001 | Test `setInputValue` path execCommand — spy, verifica selectAll/insertText | WP02 | — |
-| T002 | Test `setInputValue` path contenteditable — sin execCommand, verifica textContent | WP02 | — |
-| T007 | Test char-by-char: `__AIBBE_JITTER_RANGE:[0,0]` → insertedChars == payload chars | WP02 | — |
-| T008 | Test KeyboardEvent: keydown+keypress+keyup por caracter en orden | WP02 | — |
-| T009 | Test delay pre-submit: sleep ocurre ANTES del submit_click (via eventLog) | WP02 | — |
-| T010 | Regression: `__AIBBE_HUMAN_TYPING` no definido → comportamiento existente intacto | WP02 | — |
+| T001 | Test `setInputValue` path execCommand — spy, verifica selectAll/insertText | WP02 | — | [D] |
+| T002 | Test `setInputValue` path contenteditable — sin execCommand, verifica textContent | WP02 | — | [D] |
+| T007 | Test char-by-char: `__AIBBE_JITTER_RANGE:[0,0]` → insertedChars == payload chars | WP02 | — | [D] |
+| T008 | Test KeyboardEvent: keydown+keypress+keyup por caracter en orden | WP02 | — | [D] |
+| T009 | Test delay pre-submit: sleep ocurre ANTES del submit_click (via eventLog) | WP02 | — | [D] |
+| T010 | Regression: `__AIBBE_HUMAN_TYPING` no definido → comportamiento existente intacto | WP02 | — | [D] |
 
 ---
 
@@ -52,12 +52,12 @@
 **Estimated prompt size**: ~400 lines
 **File**: `tasks/WP02-tests-cobertura-y-humanizacion.md`
 
-- [ ] T001 Test path execCommand de `setInputValue` (WP02)
-- [ ] T002 Test path contenteditable de `setInputValue` (WP02)
-- [ ] T007 Test char-by-char insertion con jitter `[0,0]` (WP02)
-- [ ] T008 Test KeyboardEvent dispatch por caracter (WP02)
-- [ ] T009 Test delay pre-submit — sleep antes de click (WP02)
-- [ ] T010 Regression: humanización desactivada preserva comportamiento (WP02)
+- [x] T001 Test path execCommand de `setInputValue` (WP02)
+- [x] T002 Test path contenteditable de `setInputValue` (WP02)
+- [x] T007 Test char-by-char insertion con jitter `[0,0]` (WP02)
+- [x] T008 Test KeyboardEvent dispatch por caracter (WP02)
+- [x] T009 Test delay pre-submit — sleep antes de click (WP02)
+- [x] T010 Regression: humanización desactivada preserva comportamiento (WP02)
 
 **Dependencies**: WP01
 **Risks**: El override de `global.setTimeout` en T009 puede interferir con los settle timers. Mantener `__AIBBE_SETTLE_MS: 0` para que el settle use 0ms y no sea capturado por el spy.
