@@ -2,6 +2,7 @@ package aibbe
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -17,6 +18,34 @@ type extensionContentSpec struct {
 	Matches []string `json:"matches"`
 	JS      []string `json:"js"`
 	RunAt   string   `json:"run_at"`
+}
+
+type execCall struct {
+	Cmd string `json:"cmd"`
+	Val any    `json:"val"`
+}
+
+type evtRecord struct {
+	Type    string `json:"type"`
+	Bubbles bool   `json:"bubbles"`
+}
+
+type keyEvent struct {
+	Type string `json:"type"`
+	Key  string `json:"key"`
+}
+
+// nodeHandshakeResult extends nodeResult with fields needed for humanization tests.
+type nodeHandshakeResult struct {
+	nodeResult
+	ExecCalls           []execCall  `json:"execCalls"`
+	SetterCalled        bool        `json:"setterCalled"`
+	TextContentAssigned string      `json:"textContentAssigned"`
+	Events              []evtRecord `json:"events"`
+	InsertedChars       []string    `json:"insertedChars"`
+	KeyEvents           []keyEvent  `json:"keyEvents"`
+	EventLog            []string    `json:"eventLog"`
+	SubmitClicks        int         `json:"submitClicks"`
 }
 
 func readExtensionManifest(t *testing.T) extensionManifest {
@@ -1389,6 +1418,690 @@ Promise.resolve(returnValue).then((resolved) => {
 			t.Fatal("content script onMessage listener must return true while observer is still waiting")
 		}
 	})
+}
+
+func TestExtensionContent_SetInputValue_ExecCommandPath(t *testing.T) {
+	var result nodeHandshakeResult
+	runNodeJSON(t, `
+const path = require("path");
+const execCalls = [];
+let setterCalled = false;
+
+class FakeInput {
+  constructor() {}
+  focus() {}
+  dispatchEvent() { return true; }
+  // Without select() — force sub-path execCommand("selectAll")
+}
+
+global.window = {
+  requestAnimationFrame: (cb) => cb(),
+  __AIBBE_SETTLE_MS: 0,
+};
+global.requestAnimationFrame = (cb) => cb();
+
+const input = new FakeInput();
+const responseText = {
+  textContent: "ok",
+  innerText: "ok",
+  cloneNode() { return this; },
+  querySelectorAll() { return []; },
+};
+const responseContainer = {
+  querySelector(sel) {
+    if (sel.includes('message-text-content')) return responseText;
+    if (sel.includes('thinking')) return null;
+    if (sel.includes('message-actions')) return {};
+    return null;
+  },
+};
+
+let observerCallback = null;
+global.MutationObserver = class {
+  constructor(cb) { observerCallback = cb; }
+  observe() {}
+  disconnect() {}
+};
+
+global.Event = class { constructor(type, opts={}) { this.type=type; this.bubbles=opts.bubbles??false; } };
+global.console = { log(){}, warn(){}, error(){} };
+
+global.document = {
+  execCommand(cmd, _, val) {
+    execCalls.push({ cmd, val: val ?? null });
+    return true;
+  },
+  querySelector(selector) {
+    if (selector.includes('textarea') || selector.includes('contenteditable')) return input;
+    if (selector.includes('button')) return { click() {} };
+    return null;
+  },
+  querySelectorAll(selector) {
+    if (selector.includes('to-user-container')) return [responseContainer];
+    return [];
+  },
+};
+
+let onMessageListener = null;
+const contentResponses = [];
+global.chrome = {
+  runtime: {
+    sendMessage() {},
+    onMessage: { addListener(fn) { onMessageListener = fn; } },
+  },
+};
+
+require(path.resolve(process.cwd(), "extension/content.js"));
+const sendResponse = (r) => {
+  contentResponses.push(r);
+  process.stdout.write(JSON.stringify({
+    execCalls,
+    setterCalled,
+    contentResponses,
+  }));
+  process.exit(0);
+};
+onMessageListener({ cmd: "generate", payload: "hello" }, {}, sendResponse);
+
+// Trigger observer repeatedly until it resolves (or timeout)
+const interval = setInterval(() => {
+  if (observerCallback) {
+    observerCallback([{ type: "childList" }]);
+    clearInterval(interval);
+  }
+}, 10);
+`, &result)
+
+	// 1. execCommand("insertText", "hello") was called
+	foundInsert := false
+	for _, c := range result.ExecCalls {
+		if c.Cmd == "insertText" && fmt.Sprint(c.Val) == "hello" {
+			foundInsert = true
+			break
+		}
+	}
+	if !foundInsert {
+		t.Fatalf("expected execCommand insertText with payload 'hello', got %v", result.ExecCalls)
+	}
+
+	// 2. execCommand("selectAll") was called (because FakeInput has no select())
+	foundSelectAll := false
+	for _, c := range result.ExecCalls {
+		if c.Cmd == "selectAll" {
+			foundSelectAll = true
+			break
+		}
+	}
+	if !foundSelectAll {
+		t.Fatalf("expected execCommand selectAll, got %v", result.ExecCalls)
+	}
+
+	// 3. native setter was NOT invoked
+	if result.SetterCalled {
+		t.Fatal("expected native setter NOT called when execCommand is available")
+	}
+}
+
+func TestExtensionContent_SetInputValue_ContenteditablePath(t *testing.T) {
+	var result nodeHandshakeResult
+	runNodeJSON(t, `
+const path = require("path");
+const events = [];
+let textContentValue = "";
+
+const fakeDiv = {
+  getAttribute(name) { return name === "contenteditable" ? "true" : null; },
+  focus() {},
+  dispatchEvent(e) { events.push({ type: e.type, bubbles: e.bubbles }); return true; },
+  get textContent() { return textContentValue; },
+  set textContent(v) { textContentValue = v; },
+};
+
+global.window = {
+  requestAnimationFrame: (cb) => cb(),
+  __AIBBE_SETTLE_MS: 0,
+  HTMLTextAreaElement: class {},
+};
+global.requestAnimationFrame = (cb) => cb();
+
+const responseText = {
+  textContent: "ok",
+  innerText: "ok",
+  cloneNode() { return this; },
+  querySelectorAll() { return []; },
+};
+const responseContainer = {
+  querySelector(sel) {
+    if (sel.includes('message-text-content')) return responseText;
+    if (sel.includes('thinking')) return null;
+    if (sel.includes('message-actions')) return {};
+    return null;
+  },
+};
+
+let observerCallback = null;
+global.MutationObserver = class {
+  constructor(cb) { observerCallback = cb; }
+  observe() {}
+  disconnect() {}
+};
+
+global.Event = class { constructor(type, opts={}) { this.type=type; this.bubbles=opts.bubbles??false; } };
+global.console = { log(){}, warn(){}, error(){} };
+
+global.document = {
+  querySelector(selector) {
+    if (selector.includes('textarea') || selector.includes('contenteditable')) return fakeDiv;
+    if (selector.includes('button')) return { click() {} };
+    return null;
+  },
+  querySelectorAll(selector) {
+    if (selector.includes('to-user-container')) return [responseContainer];
+    return [];
+  },
+};
+
+let onMessageListener = null;
+const contentResponses = [];
+global.chrome = {
+  runtime: {
+    sendMessage() {},
+    onMessage: { addListener(fn) { onMessageListener = fn; } },
+  },
+};
+
+require(path.resolve(process.cwd(), "extension/content.js"));
+const sendResponse = (r) => {
+  contentResponses.push(r);
+  process.stdout.write(JSON.stringify({
+    textContentAssigned: textContentValue,
+    events,
+    contentResponses,
+  }));
+  process.exit(0);
+};
+onMessageListener({ cmd: "generate", payload: "hello" }, {}, sendResponse);
+
+// Trigger observer repeatedly until it resolves (or timeout)
+const interval = setInterval(() => {
+  if (observerCallback) {
+    observerCallback([{ type: "childList" }]);
+    clearInterval(interval);
+  }
+}, 10);
+`, &result)
+
+	// 1. textContent was assigned with the payload
+	if result.TextContentAssigned != "hello" {
+		t.Fatalf("textContent = %q, want hello", result.TextContentAssigned)
+	}
+
+	// 2. Event("input", { bubbles: true }) was dispatched
+	found := false
+	for _, ev := range result.Events {
+		if ev.Type == "input" && ev.Bubbles {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("expected bubbling input event dispatched after textContent assignment")
+	}
+}
+
+func TestExtensionContent_HumanTyping_InsertsCharsOneByOne(t *testing.T) {
+	var result nodeHandshakeResult
+	runNodeJSON(t, `
+const path = require("path");
+const insertedChars = [];
+let submitClicks = 0;
+
+global.KeyboardEvent = class {
+  constructor(type, init = {}) {
+    this.type = type; this.key = init.key; this.bubbles = init.bubbles ?? false;
+  }
+};
+
+const fakeInput = { focus() {}, dispatchEvent() { return true; } };
+const responseText = {
+  textContent: "ok",
+  innerText: "ok",
+  cloneNode() { return this; },
+  querySelectorAll() { return []; },
+};
+const responseContainer = {
+  querySelector(sel) {
+    if (sel.includes('message-text-content')) return responseText;
+    if (sel.includes('thinking')) return null;
+    if (sel.includes('message-actions')) return {};
+    return null;
+  },
+};
+
+let observerCallback = null;
+global.MutationObserver = class {
+  constructor(cb) { observerCallback = cb; }
+  observe() {}
+  disconnect() {}
+};
+
+global.Event = class { constructor(type, opts={}) { this.type=type; this.bubbles=opts.bubbles??false; } };
+global.console = { log(){}, warn(){}, error(){} };
+
+global.document = {
+  execCommand(cmd, _, val) {
+    if (cmd === "insertText") insertedChars.push(val);
+    return true;
+  },
+  querySelector(selector) {
+    if (selector.includes('textarea') || selector.includes('contenteditable')) return fakeInput;
+    if (selector.includes('button')) return { click() { submitClicks++; } };
+    return null;
+  },
+  querySelectorAll(selector) {
+    if (selector.includes('to-user-container')) return [responseContainer];
+    return [];
+  },
+};
+
+global.window = {
+  requestAnimationFrame: (cb) => cb(),
+  __AIBBE_SETTLE_MS: 0,
+  __AIBBE_HUMAN_TYPING: true,
+  __AIBBE_JITTER_RANGE: [0, 0],
+  __AIBBE_SUBMIT_DELAY_RANGE: [0, 0],
+};
+global.requestAnimationFrame = (cb) => cb();
+
+let onMessageListener = null;
+const contentResponses = [];
+global.chrome = {
+  runtime: {
+    sendMessage() {},
+    onMessage: { addListener(fn) { onMessageListener = fn; } },
+  },
+};
+
+require(path.resolve(process.cwd(), "extension/content.js"));
+const sendResponse = (r) => {
+  contentResponses.push(r);
+  process.stdout.write(JSON.stringify({
+    insertedChars,
+    submitClicks,
+    contentResponses,
+  }));
+  process.exit(0);
+};
+onMessageListener({ cmd: "generate", payload: "hi" }, {}, sendResponse);
+
+// Trigger observer repeatedly until it resolves (or timeout)
+const interval = setInterval(() => {
+  if (observerCallback) {
+    observerCallback([{ type: "childList" }]);
+    clearInterval(interval);
+  }
+}, 10);
+`, &result)
+
+	wantChars := []string{"h", "i"}
+	if len(result.InsertedChars) != len(wantChars) {
+		t.Fatalf("insertedChars = %v, want %v", result.InsertedChars, wantChars)
+	}
+	for i, want := range wantChars {
+		if result.InsertedChars[i] != want {
+			t.Fatalf("insertedChars[%d] = %q, want %q", i, result.InsertedChars[i], want)
+		}
+	}
+	if result.SubmitClicks != 1 {
+		t.Fatalf("submitClicks = %d, want 1", result.SubmitClicks)
+	}
+	if got := result.ContentResponses[0]["status"]; got != "success" {
+		t.Fatalf("response status = %v, want success", got)
+	}
+}
+
+func TestExtensionContent_HumanTyping_DispatchesKeyboardEventsPerChar(t *testing.T) {
+	var result nodeHandshakeResult
+	runNodeJSON(t, `
+const path = require("path");
+const keyEvents = [];
+
+global.KeyboardEvent = class {
+  constructor(type, init = {}) {
+    keyEvents.push({ type, key: init.key });
+    this.type = type; this.key = init.key; this.bubbles = init.bubbles ?? false;
+  }
+};
+
+const fakeInput = { focus() {}, dispatchEvent() { return true; } };
+const responseText = {
+  textContent: "ok",
+  innerText: "ok",
+  cloneNode() { return this; },
+  querySelectorAll() { return []; },
+};
+const responseContainer = {
+  querySelector(sel) {
+    if (sel.includes('message-text-content')) return responseText;
+    if (sel.includes('thinking')) return null;
+    if (sel.includes('message-actions')) return {};
+    return null;
+  },
+};
+
+let observerCallback = null;
+global.MutationObserver = class {
+  constructor(cb) { observerCallback = cb; }
+  observe() {}
+  disconnect() {}
+};
+
+global.Event = class { constructor(type, opts={}) { this.type=type; this.bubbles=opts.bubbles??false; } };
+global.console = { log(){}, warn(){}, error(){} };
+
+global.document = {
+  execCommand() { return true; },
+  querySelector(selector) {
+    if (selector.includes('textarea') || selector.includes('contenteditable')) return fakeInput;
+    if (selector.includes('button')) return { click() {} };
+    return null;
+  },
+  querySelectorAll(selector) {
+    if (selector.includes('to-user-container')) return [responseContainer];
+    return [];
+  },
+};
+
+global.window = {
+  requestAnimationFrame: (cb) => cb(),
+  __AIBBE_SETTLE_MS: 0,
+  __AIBBE_HUMAN_TYPING: true,
+  __AIBBE_JITTER_RANGE: [0, 0],
+  __AIBBE_SUBMIT_DELAY_RANGE: [0, 0],
+};
+global.requestAnimationFrame = (cb) => cb();
+
+let onMessageListener = null;
+const contentResponses = [];
+global.chrome = {
+  runtime: {
+    sendMessage() {},
+    onMessage: { addListener(fn) { onMessageListener = fn; } },
+  },
+};
+
+require(path.resolve(process.cwd(), "extension/content.js"));
+const sendResponse = (r) => {
+  contentResponses.push(r);
+  process.stdout.write(JSON.stringify({
+    keyEvents,
+    contentResponses,
+  }));
+  process.exit(0);
+};
+onMessageListener({ cmd: "generate", payload: "ab" }, {}, sendResponse);
+
+// Trigger observer repeatedly until it resolves (or timeout)
+const interval = setInterval(() => {
+  if (observerCallback) {
+    observerCallback([{ type: "childList" }]);
+    clearInterval(interval);
+  }
+}, 10);
+`, &result)
+
+	wantEvents := []struct{ Type, Key string }{
+		{"keydown", "a"}, {"keypress", "a"}, {"keyup", "a"},
+		{"keydown", "b"}, {"keypress", "b"}, {"keyup", "b"},
+	}
+	if len(result.KeyEvents) != len(wantEvents) {
+		t.Fatalf("keyEvents count = %d, want %d\ngot: %v", len(result.KeyEvents), len(wantEvents), result.KeyEvents)
+	}
+	for i, want := range wantEvents {
+		got := result.KeyEvents[i]
+		if got.Type != want.Type || got.Key != want.Key {
+			t.Fatalf("keyEvents[%d] = {%s %s}, want {%s %s}", i, got.Type, got.Key, want.Type, want.Key)
+		}
+	}
+}
+
+func TestExtensionContent_HumanTyping_SleepsBeforeSubmit(t *testing.T) {
+	var result nodeHandshakeResult
+	runNodeJSON(t, `
+const path = require("path");
+const eventLog = [];
+
+global.KeyboardEvent = class {
+  constructor(type, init = {}) {
+    this.type = type; this.key = init.key; this.bubbles = init.bubbles ?? false;
+  }
+};
+
+const fakeInput = { focus() {}, dispatchEvent() { return true; } };
+const responseText = {
+  textContent: "ok",
+  innerText: "ok",
+  cloneNode() { return this; },
+  querySelectorAll() { return []; },
+};
+const responseContainer = {
+  querySelector(sel) {
+    if (sel.includes('message-text-content')) return responseText;
+    if (sel.includes('thinking')) return null;
+    if (sel.includes('message-actions')) return {};
+    return null;
+  },
+};
+
+let observerCallback = null;
+global.MutationObserver = class {
+  constructor(cb) { observerCallback = cb; }
+  observe() {}
+  disconnect() {}
+};
+
+global.Event = class { constructor(type, opts={}) { this.type=type; this.bubbles=opts.bubbles??false; } };
+global.console = { log(){}, warn(){}, error(){} };
+
+global.document = {
+  execCommand() { return true; },
+  querySelector(selector) {
+    if (selector.includes('textarea') || selector.includes('contenteditable')) return fakeInput;
+    if (selector.includes('button')) return { click() { eventLog.push("submit_click"); } };
+    return null;
+  },
+  querySelectorAll(selector) {
+    if (selector.includes('to-user-container')) return [responseContainer];
+    return [];
+  },
+};
+
+global.window = {
+  requestAnimationFrame: (cb) => cb(),
+  __AIBBE_SETTLE_MS: 0,
+  __AIBBE_HUMAN_TYPING: true,
+  __AIBBE_JITTER_RANGE: [0, 0],
+  __AIBBE_SUBMIT_DELAY_RANGE: [50, 50],
+};
+global.requestAnimationFrame = (cb) => cb();
+
+const realSetTimeout = global.setTimeout;
+global.setTimeout = (cb, ms) => {
+  if (ms > 0) {
+    eventLog.push("sleep:" + ms);
+    return realSetTimeout(cb, 0); // execute immediately for test speed
+  }
+  return realSetTimeout(cb, ms);
+};
+
+let onMessageListener = null;
+const contentResponses = [];
+global.chrome = {
+  runtime: {
+    sendMessage() {},
+    onMessage: { addListener(fn) { onMessageListener = fn; } },
+  },
+};
+
+require(path.resolve(process.cwd(), "extension/content.js"));
+const sendResponse = (r) => {
+  contentResponses.push(r);
+  process.stdout.write(JSON.stringify({
+    eventLog,
+    contentResponses,
+  }));
+  process.exit(0);
+};
+onMessageListener({ cmd: "generate", payload: "hi" }, {}, sendResponse);
+
+// Trigger observer repeatedly until it resolves (or timeout)
+const interval = setInterval(() => {
+  if (observerCallback) {
+    observerCallback([{ type: "childList" }]);
+    clearInterval(interval);
+  }
+}, 10);
+`, &result)
+
+	sleepIdx, clickIdx := -1, -1
+	for i, ev := range result.EventLog {
+		if strings.HasPrefix(ev, "sleep:") && sleepIdx == -1 {
+			sleepIdx = i
+		}
+		if ev == "submit_click" && clickIdx == -1 {
+			clickIdx = i
+		}
+	}
+	if sleepIdx == -1 {
+		t.Fatalf("expected sleep before submit in event log: %v", result.EventLog)
+	}
+	if clickIdx == -1 {
+		t.Fatalf("expected submit_click in event log: %v", result.EventLog)
+	}
+	if sleepIdx >= clickIdx {
+		t.Fatalf("sleep must occur BEFORE submit_click: sleepIdx=%d, clickIdx=%d, log=%v", sleepIdx, clickIdx, result.EventLog)
+	}
+}
+
+func TestExtensionContent_HumanTyping_DisabledPreservesExistingBehavior(t *testing.T) {
+	var result nodeHandshakeResult
+	runNodeJSON(t, `
+const path = require("path");
+const keyEvents = [];
+let buttonClicks = 0;
+
+global.KeyboardEvent = class {
+  constructor(type, init = {}) { keyEvents.push({ type, key: init.key }); }
+};
+
+class FakeTextArea {
+  constructor() { this._value = ""; }
+  dispatchEvent() { return true; }
+  focus() {}
+}
+Object.defineProperty(FakeTextArea.prototype, "value", {
+  get() { return this._value; },
+  set(next) { this._value = next; },
+});
+
+const input = new FakeTextArea();
+const submitButton = {
+  disabled: false,
+  click() { buttonClicks++; },
+};
+
+const responseText = {
+  textContent: "ok",
+  innerText: "ok",
+  cloneNode() { return this; },
+  querySelectorAll() { return []; },
+};
+const responseContainer = {
+  querySelector(sel) {
+    if (sel.includes('message-text-content')) return responseText;
+    if (sel.includes('thinking')) return null;
+    if (sel.includes('message-actions')) return {};
+    return null;
+  },
+};
+
+let observerCallback = null;
+global.MutationObserver = class {
+  constructor(cb) { observerCallback = cb; }
+  observe() {}
+  disconnect() {}
+};
+
+global.Event = class { constructor(type, opts={}) { this.type=type; this.bubbles=opts.bubbles??false; } };
+global.window = {
+  HTMLTextAreaElement: FakeTextArea,
+  requestAnimationFrame: (cb) => cb(),
+  __AIBBE_SETTLE_MS: 0,
+  // __AIBBE_HUMAN_TYPING not defined
+};
+global.requestAnimationFrame = (cb) => cb();
+
+global.document = {
+  querySelector(selector) {
+    if (selector.includes('textarea') || selector.includes('contenteditable')) return input;
+    if (selector.includes('button')) return submitButton;
+    return null;
+  },
+  querySelectorAll(selector) {
+    if (selector.includes('to-user-container')) return [responseContainer];
+    return [];
+  },
+};
+
+global.console = { log(){}, warn(){}, error(){} };
+
+let onMessageListener = null;
+const contentResponses = [];
+global.chrome = {
+  runtime: {
+    sendMessage() {},
+    onMessage: { addListener(fn) { onMessageListener = fn; } },
+  },
+};
+
+require(path.resolve(process.cwd(), "extension/content.js"));
+const sendResponse = (r) => {
+  contentResponses.push(r);
+  process.stdout.write(JSON.stringify({
+    keyEvents,
+    inputValue: input.value,
+    buttonClicks,
+    contentResponses,
+  }));
+  process.exit(0);
+};
+onMessageListener({ cmd: "generate", payload: "hello" }, {}, sendResponse);
+
+// Trigger observer repeatedly until it resolves (or timeout)
+const interval = setInterval(() => {
+  if (observerCallback) {
+    observerCallback([{ type: "childList" }]);
+    clearInterval(interval);
+  }
+}, 10);
+`, &result)
+
+	// No KeyboardEvents
+	if len(result.KeyEvents) != 0 {
+		t.Fatalf("expected no KeyboardEvents when __AIBBE_HUMAN_TYPING is false, got %v", result.KeyEvents)
+	}
+	// Bulk insertion worked
+	if result.InputValue != "hello" {
+		t.Fatalf("inputValue = %q, want hello", result.InputValue)
+	}
+	// Button clicked
+	if result.ButtonClicks != 1 {
+		t.Fatalf("buttonClicks = %d, want 1", result.ButtonClicks)
+	}
+	// Successful response
+	if got := result.ContentResponses[0]["status"]; got != "success" {
+		t.Fatalf("status = %v, want success", got)
+	}
 }
 
 func TestExtensionContent_DefinesSelectorCascadeCommentsAndConstants(t *testing.T) {
