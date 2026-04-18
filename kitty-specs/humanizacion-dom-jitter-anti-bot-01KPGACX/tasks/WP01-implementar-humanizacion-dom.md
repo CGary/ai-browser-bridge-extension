@@ -19,7 +19,8 @@ subtasks:
 - T004
 - T005
 - T006
-shell_pid: '145423'
+shell_pid: "145619"
+agent: "gemini-cli"
 history:
 - date: '2026-04-18'
   event: created
@@ -237,3 +238,7 @@ async function injectAndSubmit(payload) {
 
 - `document.execCommand("delete")` podría no estar disponible en todos los contextos. La limpieza usa 3 paths como fallback — si execCommand falla, hay alternativa.
 - `window.__AIBBE_JITTER_RANGE ?? [40, 120]`: verificar que `?? [40, 120]` no sobreescribe `[0, 0]` (no debe, porque `[0,0]` no es null/undefined).
+
+## Activity Log
+
+- 2026-04-18T14:56:33Z – gemini-cli – shell_pid=145619 – Assigned agent via action command
