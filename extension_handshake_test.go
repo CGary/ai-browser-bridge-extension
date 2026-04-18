@@ -137,6 +137,22 @@ global.chrome = {
   },
 };
 
+global.MutationObserver = class {
+  constructor(cb) {}
+  observe() { }
+  disconnect() {}
+};
+
+global.document = {
+  body: {},
+  querySelector: (selector) => {
+    if (selector === "div.cover-title") {
+      return { textContent: "SIAT" };
+    }
+    return null;
+  },
+};
+
 require(path.resolve(process.cwd(), "extension/content.js"));
 process.stdout.write(JSON.stringify({ logs, sent }));
 `, &result)
@@ -153,7 +169,7 @@ process.stdout.write(JSON.stringify({ logs, sent }));
 		t.Fatalf("handshake service = %v, want notebooklm", got)
 	}
 
-	if !containsLog(result.Logs, "[aibbe] Handshake sent for notebooklm") {
+	if !containsLog(result.Logs, "[aibbe] Handshake sent: target=SIAT") {
 		t.Fatalf("expected content.js runtime logs to include handshake confirmation, got %v", result.Logs)
 	}
 }
@@ -956,7 +972,8 @@ global.window = {
 global.requestAnimationFrame = global.window.requestAnimationFrame;
 
 global.document = {
-  querySelector() {
+  querySelector(selector) {
+    if (selector === "div.cover-title") return null;
     queryCount += 1;
     if (queryCount === 1) {
       return input;
@@ -1192,6 +1209,7 @@ global.MutationObserver = class FakeMutationObserver {
 
 global.document = {
   querySelector(selector) {
+    if (selector === "div.cover-title") return null;
     queryCount += 1;
     if (queryCount === 1 && selector === 'textarea[aria-label="Query box"], textarea[aria-label="Cuadro de consulta"], textarea, div[contenteditable="true"]') {
       return input;

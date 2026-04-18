@@ -71,7 +71,9 @@ function waitForLibraryTitle() {
   observer.observe(document.body, { childList: true, subtree: true });
 }
 
-waitForLibraryTitle();
+if (typeof document !== "undefined" && typeof MutationObserver !== "undefined") {
+  waitForLibraryTitle();
+}
 
 function waitForNextFrame() {
   return new Promise((resolve) => requestAnimationFrame(resolve));

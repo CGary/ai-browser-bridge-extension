@@ -1,16 +1,16 @@
 {
-  "event_count": 15,
-  "last_event_id": "01KPGJH69Y0TX39G0M2C9Z0EXB",
-  "materialized_at": "2026-04-18T15:14:45.694674+00:00",
+  "event_count": 16,
+  "last_event_id": "01KPGS5FJEVWGGCZAD3N3YHHPC",
+  "materialized_at": "2026-04-18T17:10:41.998071+00:00",
   "mission_number": "2",
   "mission_slug": "humanizacion-dom-jitter-anti-bot-01KPGACX",
   "mission_type": "software-dev",
   "summary": {
-    "approved": 1,
+    "approved": 0,
     "blocked": 0,
     "canceled": 0,
     "claimed": 0,
-    "done": 1,
+    "done": 2,
     "for_review": 0,
     "in_progress": 0,
     "in_review": 0,
@@ -25,11 +25,11 @@
       "last_transition_at": "2026-04-18T15:10:31.102836+00:00"
     },
     "WP02": {
-      "actor": "user",
-      "force_count": 2,
-      "lane": "approved",
-      "last_event_id": "01KPGJH69Y0TX39G0M2C9Z0EXB",
-      "last_transition_at": "2026-04-18T15:14:45.694674+00:00"
+      "actor": "claude",
+      "force_count": 3,
+      "lane": "done",
+      "last_event_id": "01KPGS5FJEVWGGCZAD3N3YHHPC",
+      "last_transition_at": "2026-04-18T17:10:41.998071+00:00"
     }
   }
 }

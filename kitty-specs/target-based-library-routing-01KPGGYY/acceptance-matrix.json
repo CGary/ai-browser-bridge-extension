@@ -1,0 +1,99 @@
+{
+  "mission_slug": "target-based-library-routing-01KPGGYY",
+  "mission_number": "",
+  "mission_type": "software-dev",
+  "overall_verdict": "pass",
+  "criteria": [
+    {
+      "criterion_id": "AC-001",
+      "description": "CLI acepta flag opcional -target y lo propaga a la Request IPC (FR-001, FR-003)",
+      "proof_type": "automated_test",
+      "evidence": "go test ./cmd/cli/ -run TestCLI_TargetFlag",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-002",
+      "description": "El Daemon propaga el payload JSON sin modificar (C-001, FR-004)",
+      "proof_type": "code_review",
+      "evidence": "daemon/main.go reenv\u00eda bytes raw recibidos del socket Unix al native host",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-003",
+      "description": "Content Script extrae t\u00edtulo de librer\u00eda de div.cover-title (FR-005, C-002)",
+      "proof_type": "code_review",
+      "evidence": "extension/content.js usa selector div.cover-title en waitForLibraryTitle",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-004",
+      "description": "MutationObserver detecta carga inicial y cambios de t\u00edtulo (SPA) (FR-006, FR-007)",
+      "proof_type": "code_review",
+      "evidence": "extension/content.js implementa MutationObserver en waitForLibraryTitle y watchLibraryTitle",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-005",
+      "description": "HANDSHAKE incluye campo target con el nombre de la librer\u00eda (FR-008)",
+      "proof_type": "code_review",
+      "evidence": "extension/content.js sendHandshake incluye el par\u00e1metro target",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-006",
+      "description": "Background Script almacena target en el registro de tabs (FR-009)",
+      "proof_type": "code_review",
+      "evidence": "extension/background.js actualiza tabRegistry con message.target en el handler de HANDSHAKE",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-007",
+      "description": "Enrutamiento basado en target selecciona la tab correcta (FR-010, FR-012)",
+      "proof_type": "code_review",
+      "evidence": "extension/background.js usa findTargetedTab cuando message.target est\u00e1 presente",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-008",
+      "description": "Error target_not_found cuando no hay tabs que coincidan con el target (FR-011)",
+      "proof_type": "code_review",
+      "evidence": "extension/background.js retorna error target_not_found si findTargetedTab falla",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-009",
+      "description": "Compatibilidad hacia atr\u00e1s sin -target (FR-002, NFR-002)",
+      "proof_type": "automated_test",
+      "evidence": "go test ./cmd/cli/ -run TestCLI_TargetFlag/without_target_flag y tests existentes pasan",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    }
+  ],
+  "negative_invariants": []
+}

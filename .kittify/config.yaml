@@ -3,8 +3,8 @@ vcs:
 agents:
   available:
   - claude
-  - codex
   - gemini
+  - codex
   auto_commit: true
 project:
   uuid: 1ff46e4f-3b18-4b7d-a46b-370f0342c4a0
