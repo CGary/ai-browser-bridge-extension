@@ -10,17 +10,17 @@
 
 | ID | Description | WP | Parallel |
 |----|-------------|-----|---------|
-| T001 | Add `Target string` field to `ipc.Request` struct | WP01 | [P] |
-| T002 | Update ipc package tests for `Target` field serialization | WP01 | [P] |
-| T003 | Add `-target` string flag to CLI and pass to `Request` | WP01 | [P] |
-| T004 | Update CLI integration tests for `-target` flag | WP01 | [P] |
-| T005 | Update daemon log line to include `target` when present | WP01 | [P] |
-| T006 | Replace immediate HANDSHAKE with MutationObserver Phase 1 in `content.js` | WP02 | [P] |
-| T007 | Add MutationObserver Phase 2 for SPA navigation re-detection in `content.js` | WP02 | [P] |
-| T008 | Store `target` in tabRegistry on HANDSHAKE in `background.js` | WP02 | [P] |
-| T009 | Add `findTargetedTab(target)` function to `background.js` | WP02 | [P] |
-| T010 | Update routing in `background.js` to branch on `message.target` | WP02 | [P] |
-| T011 | Add `target_not_found` error response path in `background.js` | WP02 | [P] |
+| T001 | Add `Target string` field to `ipc.Request` struct | WP01 | [P] | [D] |
+| T002 | Update ipc package tests for `Target` field serialization | WP01 | [D] |
+| T003 | Add `-target` string flag to CLI and pass to `Request` | WP01 | [D] |
+| T004 | Update CLI integration tests for `-target` flag | WP01 | [D] |
+| T005 | Update daemon log line to include `target` when present | WP01 | [D] |
+| T006 | Replace immediate HANDSHAKE with MutationObserver Phase 1 in `content.js` | WP02 | [D] |
+| T007 | Add MutationObserver Phase 2 for SPA navigation re-detection in `content.js` | WP02 | [D] |
+| T008 | Store `target` in tabRegistry on HANDSHAKE in `background.js` | WP02 | [D] |
+| T009 | Add `findTargetedTab(target)` function to `background.js` | WP02 | [D] |
+| T010 | Update routing in `background.js` to branch on `message.target` | WP02 | [D] |
+| T011 | Add `target_not_found` error response path in `background.js` | WP02 | [D] |
 
 ---
 
@@ -38,11 +38,11 @@
 
 **Included subtasks**:
 
-- [ ] T001 Add `Target string` field to `ipc.Request` struct (WP01)
-- [ ] T002 Update ipc package tests for `Target` field serialization (WP01)
-- [ ] T003 Add `-target` string flag to CLI and pass to `Request` (WP01)
-- [ ] T004 Update CLI integration tests for `-target` flag (WP01)
-- [ ] T005 Update daemon log line to include `target` when present (WP01)
+- [x] T001 Add `Target string` field to `ipc.Request` struct (WP01)
+- [x] T002 Update ipc package tests for `Target` field serialization (WP01)
+- [x] T003 Add `-target` string flag to CLI and pass to `Request` (WP01)
+- [x] T004 Update CLI integration tests for `-target` flag (WP01)
+- [x] T005 Update daemon log line to include `target` when present (WP01)
 
 **Implementation sketch**:
 1. Add `Target string \`json:"target,omitempty"\`` to `ipc.Request`
@@ -67,12 +67,12 @@
 
 **Included subtasks**:
 
-- [ ] T006 Replace immediate HANDSHAKE with MutationObserver Phase 1 in `content.js` (WP02)
-- [ ] T007 Add MutationObserver Phase 2 for SPA navigation re-detection in `content.js` (WP02)
-- [ ] T008 Store `target` in tabRegistry on HANDSHAKE in `background.js` (WP02)
-- [ ] T009 Add `findTargetedTab(target)` function to `background.js` (WP02)
-- [ ] T010 Update routing in `background.js` to branch on `message.target` (WP02)
-- [ ] T011 Add `target_not_found` error response path in `background.js` (WP02)
+- [x] T006 Replace immediate HANDSHAKE with MutationObserver Phase 1 in `content.js` (WP02)
+- [x] T007 Add MutationObserver Phase 2 for SPA navigation re-detection in `content.js` (WP02)
+- [x] T008 Store `target` in tabRegistry on HANDSHAKE in `background.js` (WP02)
+- [x] T009 Add `findTargetedTab(target)` function to `background.js` (WP02)
+- [x] T010 Update routing in `background.js` to branch on `message.target` (WP02)
+- [x] T011 Add `target_not_found` error response path in `background.js` (WP02)
 
 **Implementation sketch**:
 1. Remove the 3-line immediate HANDSHAKE from `content.js` (lines 16–19)
