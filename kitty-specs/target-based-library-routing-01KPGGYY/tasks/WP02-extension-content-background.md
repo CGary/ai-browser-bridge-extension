@@ -24,7 +24,8 @@ subtasks:
 - T009
 - T010
 - T011
-shell_pid: '405401'
+shell_pid: "405401"
+agent: "claude"
 history:
 - date: '2026-04-18'
   event: created
@@ -457,3 +458,7 @@ spec-kitty agent action implement WP02 --agent <name>
 - Confirm the routing ternary handles `undefined` (absent JSON key) correctly as falsy
 - Confirm `findTargetedTab` uses strict equality (`===`), not loose (`==`)
 - Manual test: open DevTools on background page, check `tabRegistry` entries after loading two NotebookLM tabs
+
+## Activity Log
+
+- 2026-04-18T18:44:27Z – claude – shell_pid=405401 – Assigned agent via action command
