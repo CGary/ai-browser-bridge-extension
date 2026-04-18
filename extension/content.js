@@ -24,6 +24,58 @@ function waitForNextFrame() {
   return new Promise((resolve) => requestAnimationFrame(resolve));
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function randomBetween(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+async function typeWithJitter(element, text, range) {
+  element.focus?.();
+
+  // Clear existing content before typing character by character.
+  if (typeof document.execCommand === "function") {
+    document.execCommand("selectAll", false, null);
+    document.execCommand("delete", false, null);
+  } else if (element.getAttribute?.("contenteditable") === "true") {
+    element.textContent = "";
+  } else {
+    const nativeSetter = Object.getOwnPropertyDescriptor(
+      window.HTMLTextAreaElement?.prototype,
+      "value",
+    )?.set;
+    if (nativeSetter) {
+      nativeSetter.call(element, "");
+    }
+  }
+
+  for (const char of text) {
+    element.dispatchEvent(new KeyboardEvent("keydown", { key: char, bubbles: true }));
+    element.dispatchEvent(new KeyboardEvent("keypress", { key: char, bubbles: true }));
+
+    if (typeof document.execCommand === "function") {
+      document.execCommand("insertText", false, char);
+    } else if (element.getAttribute?.("contenteditable") === "true") {
+      element.textContent = (element.textContent ?? "") + char;
+      element.dispatchEvent(new Event("input", { bubbles: true }));
+    } else {
+      const nativeSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLTextAreaElement?.prototype,
+        "value",
+      )?.set;
+      if (nativeSetter) {
+        nativeSetter.call(element, (element.value ?? "") + char);
+        element.dispatchEvent(new Event("input", { bubbles: true }));
+      }
+    }
+
+    element.dispatchEvent(new KeyboardEvent("keyup", { key: char, bubbles: true }));
+    await sleep(randomBetween(range[0], range[1]));
+  }
+}
+
 function normalizeWhitespace(value) {
   return value
     .replace(/[ \t]+\n/g, "\n")
@@ -130,15 +182,24 @@ async function injectAndSubmit(payload) {
     return { status: "error", error: "input_not_found" };
   }
 
-  // setInputValue dispatches the input event internally (trusted via execCommand,
-  // or synthetic via fallback) — no extra dispatch needed here.
-  setInputValue(inputElement, payload);
-
-  await waitForNextFrame();
+  if (window.__AIBBE_HUMAN_TYPING) {
+    const jitterRange = window.__AIBBE_JITTER_RANGE ?? [40, 120];
+    await typeWithJitter(inputElement, payload, jitterRange);
+  } else {
+    // setInputValue dispatches the input event internally (trusted via execCommand,
+    // or synthetic via fallback) — no extra dispatch needed here.
+    setInputValue(inputElement, payload);
+    await waitForNextFrame();
+  }
 
   const submitButton = document.querySelector(SELECTORS.SUBMIT_BUTTON);
   if (!submitButton) {
     return { status: "error", error: "submit_button_not_found" };
+  }
+
+  if (window.__AIBBE_HUMAN_TYPING) {
+    const submitRange = window.__AIBBE_SUBMIT_DELAY_RANGE ?? [500, 2000];
+    await sleep(randomBetween(...submitRange));
   }
 
   submitButton.click();
