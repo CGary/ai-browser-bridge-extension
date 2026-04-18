@@ -2,7 +2,7 @@
 work_package_id: WP01
 title: 'Go Backend: IPC + CLI + Daemon'
 agent: gemini
-shell_pid: 0
+shell_pid: "403805"
 dependencies: []
 requirement_refs:
 - FR-001
@@ -21,8 +21,6 @@ subtasks:
 - T003
 - T004
 - T005
-shell_pid: "403805"
-agent: "gemini"
 history:
 - date: '2026-04-18'
   event: created

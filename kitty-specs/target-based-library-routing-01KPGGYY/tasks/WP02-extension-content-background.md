@@ -2,7 +2,7 @@
 work_package_id: WP02
 title: 'Chrome Extension: Content Script + Background Script'
 agent: gemini
-shell_pid: 0
+shell_pid: "407621"
 dependencies: []
 requirement_refs:
 - FR-005
@@ -26,8 +26,6 @@ subtasks:
 - T009
 - T010
 - T011
-shell_pid: "407621"
-agent: "gemini"
 history:
 - date: '2026-04-18'
   event: created
