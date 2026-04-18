@@ -19,14 +19,17 @@ function connectToNativeHost() {
   port.onMessage.addListener(async (message) => {
     console.log(`${LOG_PREFIX} Message from native host:`, JSON.stringify(message));
 
-    const freeTab = findFreeTab();
+    const tab = message.target
+      ? findTargetedTab(message.target)
+      : findFreeTab();
 
-    if (!freeTab) {
-      port.postMessage({ status: "error", error: "no_free_tabs" });
+    if (!tab) {
+      const error = message.target ? "target_not_found" : "no_free_tabs";
+      port.postMessage({ status: "error", error });
       return;
     }
 
-    const { tabId, entry } = freeTab;
+    const { tabId, entry } = tab;
     entry.state = "busy";
 
     try {
@@ -71,9 +74,10 @@ chrome.runtime.onMessage.addListener((message, sender) => {
     state: "free",
     service: message.service,
     lastSeen: Date.now(),
+    target: message.target,
   });
 
-  console.log(`${LOG_PREFIX} Tab ${sender.tab.id} registered for ${message.service}`);
+  console.log(`${LOG_PREFIX} Tab ${sender.tab.id} registered for ${message.service} target=${message.target}`);
 });
 
 chrome.tabs.onRemoved.addListener((tabId) => {
@@ -88,6 +92,15 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 function findFreeTab() {
   for (const [tabId, entry] of tabRegistry) {
     if (entry.state === "free") return { tabId, entry };
+  }
+  return null;
+}
+
+function findTargetedTab(target) {
+  for (const [tabId, entry] of tabRegistry) {
+    if (entry.state === "free" && entry.target === target) {
+      return { tabId, entry };
+    }
   }
   return null;
 }
