@@ -1,4 +1,16 @@
 {
+  "acceptance_history": [
+    {
+      "acceptance_mode": "pr",
+      "accepted_at": "2026-04-18T22:33:08.803001+00:00",
+      "accepted_by": "gary",
+      "accepted_from_commit": "dea6148c60ad6fa1ad45bc361a05cec80606e3bf"
+    }
+  ],
+  "acceptance_mode": "pr",
+  "accepted_at": "2026-04-18T22:33:08.803001+00:00",
+  "accepted_by": "gary",
+  "accepted_from_commit": "dea6148c60ad6fa1ad45bc361a05cec80606e3bf",
   "created_at": "2026-04-18T14:47:19.982964+00:00",
   "friendly_name": "Target-based Library Routing",
   "mission_id": "01KPGGYYTN0BT3K5ZCZSTG1WEX",
@@ -6,7 +18,7 @@
   "mission_slug": "target-based-library-routing-01KPGGYY",
   "mission_type": "software-dev",
   "slug": "target-based-library-routing-01KPGGYY",
+  "source_description": "Add -target CLI flag to route queries to a specific NotebookLM library tab by name, using MutationObserver-based DOM title detection in the Content Script.",
   "target_branch": "main",
-  "vcs": "git",
-  "source_description": "Add -target CLI flag to route queries to a specific NotebookLM library tab by name, using MutationObserver-based DOM title detection in the Content Script."
+  "vcs": "git"
 }
