@@ -1,7 +1,7 @@
 {
-  "event_count": 2,
-  "last_event_id": "01KPGJ3Z4SB9BPYH25Z23QPH8F",
-  "materialized_at": "2026-04-18T15:07:32.377188+00:00",
+  "event_count": 4,
+  "last_event_id": "01KPGY0KAT7WQRHB81SH9E36WJ",
+  "materialized_at": "2026-04-18T18:35:24.890648+00:00",
   "mission_number": "",
   "mission_slug": "target-based-library-routing-01KPGGYY",
   "mission_type": "software-dev",
@@ -12,17 +12,17 @@
     "claimed": 0,
     "done": 0,
     "for_review": 0,
-    "in_progress": 0,
+    "in_progress": 1,
     "in_review": 0,
-    "planned": 2
+    "planned": 1
   },
   "work_packages": {
     "WP01": {
-      "actor": "finalize-tasks",
+      "actor": "implement-command",
       "force_count": 1,
-      "lane": "planned",
-      "last_event_id": "01KPGJ3Z32TYRWB7PC24PCKSKG",
-      "last_transition_at": "2026-04-18T15:07:32.322099+00:00"
+      "lane": "in_progress",
+      "last_event_id": "01KPGY0KAT7WQRHB81SH9E36WJ",
+      "last_transition_at": "2026-04-18T18:35:24.890648+00:00"
     },
     "WP02": {
       "actor": "finalize-tasks",
