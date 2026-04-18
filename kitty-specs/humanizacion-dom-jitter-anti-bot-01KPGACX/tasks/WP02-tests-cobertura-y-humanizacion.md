@@ -19,6 +19,8 @@ subtasks:
 - T008
 - T009
 - T010
+agent: "gemini"
+shell_pid: "165878"
 history:
 - date: '2026-04-18'
   event: created
@@ -497,3 +499,7 @@ if got := result.ContentResponses[0]["status"]; got != "success" {
 
 - **Riesgo**: El override de `global.setTimeout` en T009 puede afectar los settle timers del observer. Mitigación: `__AIBBE_SETTLE_MS: 0` hace que el settle use `setTimeout(cb, 0)` — el override de T009 solo captura `ms > 0`, por lo que el settle (0ms) pasa sin interferencia.
 - **Riesgo**: En T001, `waitForAIResponse` inicia un `MutationObserver` y espera que `observerCallback` sea invocado con el estado "ready". Si el harness no invoca el callback correctamente, el test puede colgar. Usar el mismo patrón que los tests existentes.
+
+## Activity Log
+
+- 2026-04-18T15:08:50Z – gemini – shell_pid=165878 – Started implementation via action command
