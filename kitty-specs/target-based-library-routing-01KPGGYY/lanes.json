@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "mission_slug": "target-based-library-routing-01KPGGYY",
+  "mission_id": "01KPGGYYTN0BT3K5ZCZSTG1WEX",
+  "mission_branch": "kitty/mission-target-based-library-routing-01KPGGYY",
+  "target_branch": "main",
+  "lanes": [
+    {
+      "lane_id": "lane-a",
+      "wp_ids": [
+        "WP01"
+      ],
+      "write_scope": [
+        "cmd/cli/**",
+        "daemon/main.go",
+        "internal/ipc/**"
+      ],
+      "predicted_surfaces": [
+        "api",
+        "tests"
+      ],
+      "depends_on_lanes": [],
+      "parallel_group": 0
+    },
+    {
+      "lane_id": "lane-b",
+      "wp_ids": [
+        "WP02"
+      ],
+      "write_scope": [
+        "extension/background.js",
+        "extension/content.js"
+      ],
+      "predicted_surfaces": [
+        "api",
+        "app-shell",
+        "artifact-rendering",
+        "legacy-cleanup",
+        "tracker-integration"
+      ],
+      "depends_on_lanes": [],
+      "parallel_group": 0
+    }
+  ],
+  "computed_at": "2026-04-18T15:07:32.381353+00:00",
+  "computed_from": "dependency_graph+ownership",
+  "planning_artifact_wps": []
+}
