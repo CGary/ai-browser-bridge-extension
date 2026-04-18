@@ -1,0 +1,10 @@
+{
+  "created_at": "2026-04-18T14:47:19.982964+00:00",
+  "friendly_name": "target based library routing",
+  "mission_id": "01KPGGYYTN0BT3K5ZCZSTG1WEX",
+  "mission_number": null,
+  "mission_slug": "target-based-library-routing-01KPGGYY",
+  "mission_type": "software-dev",
+  "slug": "target-based-library-routing-01KPGGYY",
+  "target_branch": "main"
+}
