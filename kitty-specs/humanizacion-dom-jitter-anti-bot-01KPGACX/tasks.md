@@ -11,10 +11,10 @@
 
 | ID | Description | WP | Parallel |
 |----|-------------|-----|---------|
-| T003 | Agregar `sleep(ms)` helper a `content.js` | WP01 | [P] |
-| T004 | Agregar `randomBetween(min, max)` helper a `content.js` | WP01 | [P] |
-| T005 | Implementar `typeWithJitter(element, text, range)` async function | WP01 | — |
-| T006 | Modificar `injectAndSubmit`: check `__AIBBE_HUMAN_TYPING`, branch humanizado | WP01 | — |
+| T003 | Agregar `sleep(ms)` helper a `content.js` | WP01 | [P] | [D] |
+| T004 | Agregar `randomBetween(min, max)` helper a `content.js` | WP01 | [D] |
+| T005 | Implementar `typeWithJitter(element, text, range)` async function | WP01 | — | [D] |
+| T006 | Modificar `injectAndSubmit`: check `__AIBBE_HUMAN_TYPING`, branch humanizado | WP01 | — | [D] |
 | T001 | Test `setInputValue` path execCommand — spy, verifica selectAll/insertText | WP02 | — |
 | T002 | Test `setInputValue` path contenteditable — sin execCommand, verifica textContent | WP02 | — |
 | T007 | Test char-by-char: `__AIBBE_JITTER_RANGE:[0,0]` → insertedChars == payload chars | WP02 | — |
@@ -34,10 +34,10 @@
 **Estimated prompt size**: ~300 lines
 **File**: `tasks/WP01-implementar-humanizacion-dom.md`
 
-- [ ] T003 Agregar `sleep(ms)` helper a `content.js` (WP01)
-- [ ] T004 Agregar `randomBetween(min, max)` helper a `content.js` (WP01)
-- [ ] T005 Implementar `typeWithJitter(element, text, range)` async function (WP01)
-- [ ] T006 Modificar `injectAndSubmit` con `__AIBBE_HUMAN_TYPING` check (WP01)
+- [x] T003 Agregar `sleep(ms)` helper a `content.js` (WP01)
+- [x] T004 Agregar `randomBetween(min, max)` helper a `content.js` (WP01)
+- [x] T005 Implementar `typeWithJitter(element, text, range)` async function (WP01)
+- [x] T006 Modificar `injectAndSubmit` con `__AIBBE_HUMAN_TYPING` check (WP01)
 
 **Dependencies**: ninguna
 **Risks**: El paso de limpieza inicial en `typeWithJitter` es crítico — sin él, el texto se concatenaría al contenido previo del campo.
