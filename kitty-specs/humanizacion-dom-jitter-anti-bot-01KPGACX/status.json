@@ -1,7 +1,7 @@
 {
-  "event_count": 4,
-  "last_event_id": "01KPGHFP0F5AY4AKQ09C6Q3FPK",
-  "materialized_at": "2026-04-18T14:56:27.663425+00:00",
+  "event_count": 5,
+  "last_event_id": "01KPGHH6SYMJHZV3HK7YK39JFG",
+  "materialized_at": "2026-04-18T14:57:17.630240+00:00",
   "mission_number": "",
   "mission_slug": "humanizacion-dom-jitter-anti-bot-01KPGACX",
   "mission_type": "software-dev",
@@ -11,18 +11,18 @@
     "canceled": 0,
     "claimed": 0,
     "done": 0,
-    "for_review": 0,
-    "in_progress": 1,
+    "for_review": 1,
+    "in_progress": 0,
     "in_review": 0,
     "planned": 1
   },
   "work_packages": {
     "WP01": {
-      "actor": "implement-command",
+      "actor": "user",
       "force_count": 1,
-      "lane": "in_progress",
-      "last_event_id": "01KPGHFP0F5AY4AKQ09C6Q3FPK",
-      "last_transition_at": "2026-04-18T14:56:27.663425+00:00"
+      "lane": "for_review",
+      "last_event_id": "01KPGHH6SYMJHZV3HK7YK39JFG",
+      "last_transition_at": "2026-04-18T14:57:17.630240+00:00"
     },
     "WP02": {
       "actor": "finalize-tasks",
