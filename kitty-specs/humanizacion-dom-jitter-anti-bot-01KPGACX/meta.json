@@ -1,10 +1,12 @@
 {
   "created_at": "2026-04-18T12:52:37.186943+00:00",
-  "friendly_name": "humanizacion dom jitter anti bot",
+  "friendly_name": "Humanización DOM con Jitter Anti-Bot",
   "mission_id": "01KPGACXBHV42ATCXGJ9CQDWBG",
   "mission_number": null,
   "mission_slug": "humanizacion-dom-jitter-anti-bot-01KPGACX",
   "mission_type": "software-dev",
   "slug": "humanizacion-dom-jitter-anti-bot-01KPGACX",
-  "target_branch": "main"
+  "source_description": "Verificar cobertura de tests del content script e implementar humanización de inyección DOM (tipeo caracter-por-caracter con jitter) para evitar detección de bot por Google en NotebookLM.",
+  "target_branch": "main",
+  "vcs": "git"
 }
