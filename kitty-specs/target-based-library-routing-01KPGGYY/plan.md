@@ -1,108 +1,173 @@
-# Implementation Plan: [FEATURE]
-*Path: [templates/plan-template.md](templates/plan-template.md)*
+# Implementation Plan: Target-based Library Routing
 
-
-**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
-**Input**: Feature specification from `/kitty-specs/[###-feature-name]/spec.md`
-
-**Note**: This template is filled in by the `/spec-kitty.plan` command. See `src/specify_cli/missions/software-dev/command-templates/plan.md` for the execution workflow.
-
-The planner will not begin until all planning questions have been answered—capture those answers in this document before progressing to later phases.
+**Branch**: `main` | **Date**: 2026-04-18 | **Spec**: [spec.md](spec.md)  
+**Mission**: `target-based-library-routing-01KPGGYY` (`01KPGGYYTN0BT3K5ZCZSTG1WEX`)  
+**Merge target**: `main`
 
 ## Summary
 
-[Extract from feature spec: primary requirement + technical approach from research]
+Add a `-target` flag to the CLI so users can route queries to a specific NotebookLM library when multiple tabs are open. The Go backend adds one field to the IPC struct and one CLI flag. The Chrome Extension reads the library title from the DOM using MutationObserver, registers it in the tab registry, and routes requests by target match. The two implementation lanes are fully independent and can execute in parallel.
 
 ## Technical Context
 
-<!--
-  ACTION REQUIRED: Replace the content in this section with the technical details
-  for the project. The structure here is presented in advisory capacity to guide
-  the iteration process.
--->
-
-**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]  
-**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
-**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]  
-**Testing**: [Project-specific test approach or NEEDS CLARIFICATION]
-**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
-**Project Type**: [single/web/mobile - determines source structure]  
-**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]  
-**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]  
-**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
+**Language/Version**: Go 1.21+ (backend), JavaScript ES2020 (Chrome Extension MV3)  
+**Primary Dependencies**: Go stdlib only; Chrome Extension APIs (`chrome.runtime`, `chrome.tabs`)  
+**Storage**: In-memory only (tabRegistry Map in Background Script; no `chrome.storage.*`)  
+**Testing**: Go — table-driven tests (`go test ./...`); Extension — manual browser test (no automated harness)  
+**Target Platform**: Linux daemon + Chromium MV3 Extension  
+**Performance Goals**: HANDSHAKE sent within 5 s of DOM readiness (NFR-001)  
+**Constraints**: Max 1 MB IPC message; Daemon logic unchanged; No disk persistence
 
 ## Charter Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+*Charter absent — skipped.*
 
-[Gates determined based on charter file]
+## Lane Architecture
+
+This feature decomposes into **two fully independent lanes** with a single shared JSON contract (`target` field) defined upfront.
+
+```
+Contract boundary: { "target": "<library name>" } in IPC JSON
+        │
+        ├── Lane A: Go Backend ──────────────────────────────────────────
+        │   internal/ipc/ipc.go   Add Target field to Request struct
+        │   cmd/cli/main.go        Add -target flag
+        │   (daemon/main.go)       Optional: log target field
+        │
+        └── Lane B: Chrome Extension ────────────────────────────────────
+            extension/content.js    MutationObserver + HANDSHAKE with target
+            extension/background.js tabRegistry target field + targeted routing
+```
+
+**Why they're independent**: Lane A serializes `target` into JSON. Lane B reads `message.target` from JSON. They share only the field name — defined in the spec and contracts. Neither lane requires the other's code to compile, test, or validate.
+
+**Integration**: When both lanes are merged, end-to-end routing works automatically — no glue code.
 
 ## Project Structure
 
-### Documentation (this feature)
+### Documentation
 
 ```
-kitty-specs/[###-feature]/
-├── plan.md              # This file (/spec-kitty.plan command output)
-├── research.md          # Phase 0 output (/spec-kitty.plan command)
-├── data-model.md        # Phase 1 output (/spec-kitty.plan command)
-├── quickstart.md        # Phase 1 output (/spec-kitty.plan command)
-├── contracts/           # Phase 1 output (/spec-kitty.plan command)
-└── tasks.md             # Phase 2 output (/spec-kitty.tasks command - NOT created by /spec-kitty.plan)
+kitty-specs/target-based-library-routing-01KPGGYY/
+├── plan.md           ← This file
+├── spec.md
+├── research.md       ← Phase 0 output
+├── data-model.md     ← Phase 1 output
+├── contracts/
+│   ├── ipc-request.md
+│   └── handshake.md
+└── tasks/            ← Created by /spec-kitty.tasks
 ```
 
-### Source Code (repository root)
-<!--
-  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
-  for this feature. Delete unused options and expand the chosen structure with
-  real paths (e.g., apps/admin, packages/something). The delivered plan must
-  not include Option labels.
--->
+### Source (files touched per lane)
 
 ```
-# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
-src/
-├── models/
-├── services/
-├── cli/
-└── lib/
+Lane A — Go Backend
+├── internal/ipc/ipc.go          Request.Target field (1 line)
+├── cmd/cli/main.go              -target flag + marshal (3 lines)
+└── daemon/main.go               log line (optional, 1 line)
 
-tests/
-├── contract/
-├── integration/
-└── unit/
-
-# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
-backend/
-├── src/
-│   ├── models/
-│   ├── services/
-│   └── api/
-└── tests/
-
-frontend/
-├── src/
-│   ├── components/
-│   ├── pages/
-│   └── services/
-└── tests/
-
-# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
-api/
-└── [same as backend above]
-
-ios/ or android/
-└── [platform-specific structure: feature modules, UI flows, platform tests]
+Lane B — Extension
+├── extension/content.js         MutationObserver HANDSHAKE (±30 lines)
+└── extension/background.js      tabRegistry + routing (±20 lines)
 ```
 
-**Structure Decision**: [Document the selected structure and reference the real
-directories captured above]
+## Phase 0: Research
+
+*Complete.* See [research.md](research.md). No unknowns remain.
+
+Key findings:
+- DOM selector confirmed: `div.cover-title` (from `docs/chat-panel.html`)
+- MutationObserver two-phase strategy: appearance (Phase 1) + mutation watch (Phase 2)
+- Daemon requires zero routing changes — forwards JSON bytes transparently
+- `omitempty` on `Target` field preserves full backward compatibility
+
+## Phase 1: Design & Contracts
+
+*Complete.* See [data-model.md](data-model.md) and [contracts/](contracts/).
+
+### Lane A Design
+
+**`internal/ipc/ipc.go`** — Add one field:
+```go
+type Request struct {
+    Cmd     string `json:"cmd"`
+    Target  string `json:"target,omitempty"`  // ← ADD
+    Payload string `json:"payload"`
+}
+```
+
+**`cmd/cli/main.go`** — Add flag and pass to Request:
+```go
+target := flag.String("target", "", "target library name (optional)")
+// ...
+ipc.Request{Cmd: *cmd, Target: *target, Payload: *payload}
+```
+
+**`daemon/main.go`** (optional) — Update log format to include target.
+
+### Lane B Design
+
+**`extension/content.js`** — Replace immediate HANDSHAKE with observer-based approach:
+
+```js
+// Phase 1: wait for div.cover-title to appear with content
+// Phase 2: watch for content changes (SPA navigation)
+// Invariant: HANDSHAKE only sent when target is non-empty string
+// Timeout: 5 s, then log warning and stop
+```
+
+**`extension/background.js`** — Two changes:
+
+1. Store `target` in registry on HANDSHAKE:
+```js
+tabRegistry.set(sender.tab.id, {
+  state: "free",
+  service: message.service,
+  lastSeen: Date.now(),
+  target: message.target,   // ← ADD
+});
+```
+
+2. Add `findTargetedTab` and branch routing:
+```js
+function findTargetedTab(target) {
+  for (const [tabId, entry] of tabRegistry) {
+    if (entry.state === "free" && entry.target === target) return { tabId, entry };
+  }
+  return null;
+}
+
+// In port.onMessage handler:
+const tab = message.target
+  ? findTargetedTab(message.target)
+  : findFreeTab();
+
+if (!tab) {
+  const error = message.target ? "target_not_found" : "no_free_tabs";
+  port.postMessage({ status: "error", error });
+  return;
+}
+```
 
 ## Complexity Tracking
 
-*Fill ONLY if Charter Check has violations that must be justified*
+No charter violations.
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
-| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
+## Risks
+
+| Risk | Severity | Mitigation |
+|------|----------|------------|
+| `div.cover-title` selector changes with NotebookLM UI update | Medium | Selector is in `SELECTORS` constant — single change point |
+| HANDSHAKE sent before title renders | High | MutationObserver Phase 1 guards this — never sends with empty target |
+| Target stale after SPA navigation | High | MutationObserver Phase 2 re-sends HANDSHAKE on mutation |
+| Tab busy when target matches | Low | Documented behavior: returns `target_not_found` |
+
+## Merge Strategy
+
+Both lanes produce isolated diffs with no file overlap. Either can merge first. Recommended order: **Lane A first** (smaller, lower risk), then **Lane B** — but strictly optional since there are no conflicts.
+
+---
+
+**Branch**: `main → main`  
+**Next step**: `/spec-kitty.tasks`
