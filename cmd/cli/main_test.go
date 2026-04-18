@@ -70,6 +70,51 @@ func TestCLI_ValidRequest_PrintsResponse(t *testing.T) {
 	}
 }
 
+func TestCLI_TargetFlag(t *testing.T) {
+	requireUnixSocketSupport(t)
+	socketPath := tempSocketPath(t)
+
+	tests := []struct {
+		name        string
+		args        []string
+		wantCmd     string
+		wantTarget  string
+		wantPayload string
+	}{
+		{
+			name:        "with_target_flag",
+			args:        []string{"-cmd", "generate", "-target", "SIAT", "-payload", "question"},
+			wantCmd:     "generate",
+			wantTarget:  "SIAT",
+			wantPayload: "question",
+		},
+		{
+			name:        "without_target_flag",
+			args:        []string{"-cmd", "generate", "-payload", "question"},
+			wantCmd:     "generate",
+			wantTarget:  "",
+			wantPayload: "question",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			requests, stop := startMockDaemon(t, socketPath, []byte(`{"status":"ok"}`))
+			defer stop()
+
+			_, _, err := runCLI(t, socketPath, nil, tt.args...)
+			if err != nil {
+				t.Fatalf("expected CLI success, got err=%v", err)
+			}
+
+			req := <-requests
+			if req.Cmd != tt.wantCmd || req.Target != tt.wantTarget || req.Payload != tt.wantPayload {
+				t.Fatalf("unexpected request: %+v", req)
+			}
+		})
+	}
+}
+
 func TestCLI_EmptyPayload_SendsEmptyString(t *testing.T) {
 	requireUnixSocketSupport(t)
 	socketPath := tempSocketPath(t)

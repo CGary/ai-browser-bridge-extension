@@ -174,7 +174,11 @@ func handleConnection(conn net.Conn) {
 		return
 	}
 
-	fmt.Fprintf(os.Stderr, "[INFO] [Daemon] received: cmd=%s payload=%s\n", req.Cmd, req.Payload)
+	targetStr := ""
+	if req.Target != "" {
+		targetStr = fmt.Sprintf(" target=%s", req.Target)
+	}
+	fmt.Fprintf(os.Stderr, "[INFO] [Daemon] received: cmd=%s%s payload=%s\n", req.Cmd, targetStr, req.Payload)
 
 	if err := nativemessaging.WriteMessage(nativeOut, data); err != nil {
 		fmt.Fprintf(os.Stderr, "[ERROR] [Daemon] native messaging write: %v\n", err)
