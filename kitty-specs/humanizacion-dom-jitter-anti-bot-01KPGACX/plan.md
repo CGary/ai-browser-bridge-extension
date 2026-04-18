@@ -1,108 +1,120 @@
-# Implementation Plan: [FEATURE]
-*Path: [templates/plan-template.md](templates/plan-template.md)*
+# Implementation Plan: Humanización DOM con Jitter Anti-Bot
 
+**Mission**: `humanizacion-dom-jitter-anti-bot-01KPGACX`
+**Mission ID**: `01KPGACXBHV42ATCXGJ9CQDWBG`
+**Target Branch**: `main`
+**Date**: 2026-04-18
+**Spec**: [spec.md](spec.md)
 
-**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
-**Input**: Feature specification from `/kitty-specs/[###-feature-name]/spec.md`
-
-**Note**: This template is filled in by the `/spec-kitty.plan` command. See `src/specify_cli/missions/software-dev/command-templates/plan.md` for the execution workflow.
-
-The planner will not begin until all planning questions have been answered—capture those answers in this document before progressing to later phases.
+---
 
 ## Summary
 
-[Extract from feature spec: primary requirement + technical approach from research]
+Cubrir con tests los paths de `setInputValue` sin cobertura (`execCommand` y `contenteditable`) e implementar humanización de inyección DOM: función `typeWithJitter` que inserta texto caracter-por-caracter con `KeyboardEvent` y delays aleatorios, activada por `window.__AIBBE_HUMAN_TYPING`. Dos Lanes independientes sin conflicto de merge.
+
+---
+
+## Branch Contract
+
+| Field | Value |
+|-------|-------|
+| Current branch | `main` |
+| Planning base | `main` |
+| Merge target | `main` |
+| `branch_matches_target` | `true` |
+
+---
 
 ## Technical Context
 
-<!--
-  ACTION REQUIRED: Replace the content in this section with the technical details
-  for the project. The structure here is presented in advisory capacity to guide
-  the iteration process.
--->
+**Language/Version**: Vanilla JS (ES2020, no bundler), Go 1.21 para tests
+**Primary Dependencies**: `document.execCommand`, `MutationObserver`, `KeyboardEvent`, `setTimeout`
+**Storage**: N/A
+**Testing**: Go test harness con scripts Node.js inline (`runNodeJSON`). `go test ./...` desde raíz.
+**Target Platform**: Chromium Extension (Manifest V3), NotebookLM
+**Project Type**: Browser extension + Go daemon
+**Performance Goals**: Jitter default 40–120 ms/char no afecta UX (es headless)
+**Constraints**: Sin dependencias externas en `content.js`. `KeyboardEvent` sintéticos tienen `isTrusted: false`.
 
-**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]  
-**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
-**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]  
-**Testing**: [Project-specific test approach or NEEDS CLARIFICATION]
-**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
-**Project Type**: [single/web/mobile - determines source structure]  
-**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]  
-**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]  
-**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
+---
 
 ## Charter Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+Governance: `software-dev-default`, DIR-001, DIR-002. Sin conflictos detectados. Cambios aditivos, no modifican contratos IPC ni el protocolo Native Messaging.
 
-[Gates determined based on charter file]
+---
 
 ## Project Structure
 
-### Documentation (this feature)
+### Documentation
 
 ```
-kitty-specs/[###-feature]/
-├── plan.md              # This file (/spec-kitty.plan command output)
-├── research.md          # Phase 0 output (/spec-kitty.plan command)
-├── data-model.md        # Phase 1 output (/spec-kitty.plan command)
-├── quickstart.md        # Phase 1 output (/spec-kitty.plan command)
-├── contracts/           # Phase 1 output (/spec-kitty.plan command)
-└── tasks.md             # Phase 2 output (/spec-kitty.tasks command - NOT created by /spec-kitty.plan)
+kitty-specs/humanizacion-dom-jitter-anti-bot-01KPGACX/
+├── spec.md
+├── plan.md              ← este archivo
+├── research.md          ← generado
+├── data-model.md        ← generado (contratos de funciones)
+├── checklists/
+│   └── requirements.md
+└── tasks/               ← generado por /spec-kitty.tasks
 ```
 
-### Source Code (repository root)
-<!--
-  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
-  for this feature. Delete unused options and expand the chosen structure with
-  real paths (e.g., apps/admin, packages/something). The delivered plan must
-  not include Option labels.
--->
+### Source Code
 
 ```
-# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
-src/
-├── models/
-├── services/
-├── cli/
-└── lib/
+extension/
+└── content.js           ← Lane B: agrega sleep, randomBetween, typeWithJitter; modifica injectAndSubmit
 
-tests/
-├── contract/
-├── integration/
-└── unit/
-
-# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
-backend/
-├── src/
-│   ├── models/
-│   ├── services/
-│   └── api/
-└── tests/
-
-frontend/
-├── src/
-│   ├── components/
-│   ├── pages/
-│   └── services/
-└── tests/
-
-# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
-api/
-└── [same as backend above]
-
-ios/ or android/
-└── [platform-specific structure: feature modules, UI flows, platform tests]
+extension_handshake_test.go  ← Lane A: tests execCommand + contenteditable
+                              ← Lane B: tests humanización
 ```
 
-**Structure Decision**: [Document the selected structure and reference the real
-directories captured above]
+---
 
-## Complexity Tracking
+## Lane Breakdown
 
-*Fill ONLY if Charter Check has violations that must be justified*
+### Lane A — Test Coverage de Paths Existentes
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
-| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |
+**Objetivo**: Cubrir con tests los paths de `setInputValue` sin cobertura.
+**Archivos**: `extension_handshake_test.go` únicamente.
+**Dependencia**: Ninguna. Lane A es completamente independiente.
+
+| WP | Título | Descripción |
+|----|--------|-------------|
+| WP-A1 | Tests path execCommand | Test `TestExtensionContent_SetInputValue_ExecCommandPath`: harness con `document.execCommand` espía y sin native setter. Verifica: `selectAll` + `insertText(payload)` en orden, native setter no invocado. |
+| WP-A2 | Tests path contenteditable | Test `TestExtensionContent_SetInputValue_ContenteditablePath`: harness con elemento `contenteditable="true"`, sin `value`, sin `execCommand`. Verifica: `textContent = payload` y dispatch `Event("input", { bubbles: true })`. |
+
+---
+
+### Lane B — Implementación de Humanización
+
+**Objetivo**: Implementar tipeo caracter-por-caracter con jitter + KeyboardEvents + delay pre-submit.
+**Archivos**: `extension/content.js` y `extension_handshake_test.go`.
+**Dependencia interna**: WP-B2 depende de WP-B1.
+**Dependencia cross-lane**: Ninguna de Lane A.
+
+| WP | Título | Descripción |
+|----|--------|-------------|
+| WP-B1 | Implementar `typeWithJitter` | Agregar `sleep(ms)`, `randomBetween(min, max)`, `typeWithJitter(element, text, range)` a `content.js`. Modificar `injectAndSubmit`: cuando `window.__AIBBE_HUMAN_TYPING` es `true` usar `typeWithJitter` + delay pre-submit; path existente intacto si es `false` o no definido. |
+| WP-B2 | Tests de humanización | Tests: (1) chars insertados uno-a-uno con `__AIBBE_JITTER_RANGE: [0,0]`; (2) KeyboardEvent keydown+keypress+keyup por char; (3) delay pre-submit con `__AIBBE_SUBMIT_DELAY_RANGE: [0,0]`; (4) flag `false` preserva comportamiento actual. |
+
+---
+
+## Orden de Ejecución
+
+```
+Lane A ──── WP-A1 → WP-A2
+                             ──── merge a main
+Lane B ──── WP-B1 → WP-B2
+```
+
+Lane A y Lane B corren en paralelo. Dentro de Lane B, WP-B2 depende de WP-B1.
+
+---
+
+## Criterios de Completitud
+
+1. `go test ./...` pasa al 100%.
+2. Los 3 paths de `setInputValue` tienen cobertura: execCommand (WP-A1), native setter (ya existente), contenteditable (WP-A2).
+3. Con `__AIBBE_HUMAN_TYPING: true` y jitter `[0,0]`: inserción char-por-char + KeyboardEvents verificados (WP-B2).
+4. Con `__AIBBE_HUMAN_TYPING: false`: comportamiento existente sin regresiones.
