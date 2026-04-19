@@ -1,10 +1,12 @@
 {
   "created_at": "2026-04-19T21:48:41.881021+00:00",
-  "friendly_name": "dynamic selector calibration system",
+  "friendly_name": "Dynamic Selector Calibration System",
   "mission_id": "01KPKVF761KT27SJ1GZFNEMFYW",
   "mission_number": null,
   "mission_slug": "dynamic-selector-calibration-system-01KPKVF7",
   "mission_type": "software-dev",
   "slug": "dynamic-selector-calibration-system-01KPKVF7",
-  "target_branch": "main"
+  "source_description": "Proposal: docs/propuesta-calibracion-dinamica.md — Runtime selector override system with persistence and Visual Picker for the aibbe Chrome extension.",
+  "target_branch": "main",
+  "vcs": "git"
 }
