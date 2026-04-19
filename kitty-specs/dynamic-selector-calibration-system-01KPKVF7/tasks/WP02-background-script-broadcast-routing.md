@@ -13,6 +13,9 @@ requirement_refs:
 planning_base_branch: main
 merge_target_branch: main
 branch_strategy: Planning artifacts for this feature were generated on main. During /spec-kitty.implement this WP may branch from a dependency-specific base, but completed changes must merge back into main unless the human explicitly redirects the landing branch.
+base_branch: kitty/mission-dynamic-selector-calibration-system-01KPKVF7
+base_commit: 236b68632e699eb66b0c12305ff42b946fc9e1e2
+created_at: '2026-04-19T22:22:59.752878+00:00'
 subtasks:
 - T010
 - T011
@@ -20,6 +23,7 @@ subtasks:
 - T013
 - T014
 - T015
+shell_pid: '1520960'
 history:
 - date: '2026-04-19'
   agent: spec-kitty.tasks
