@@ -179,14 +179,18 @@
     {
       "invariant_id": "NI-001",
       "description": "No hay referencias directas a SELECTORS. en content.js (solo DEFAULT_SELECTORS. y activeSelectors.)",
-      "evidence": "grep 'SELECTORS\\.' extension/content.js | grep -v 'DEFAULT_SELECTORS\\|activeSelectors' → sin resultados",
-      "pass_fail": "pass"
+      "verification_method": "grep_absence",
+      "verification_command": "grep -n 'SELECTORS\\.' extension/content.js | grep -v 'DEFAULT_SELECTORS\\|activeSelectors'",
+      "result": "confirmed_absent",
+      "evidence": "Zero matches — all references migrated to activeSelectors. or DEFAULT_SELECTORS."
     },
     {
       "invariant_id": "NI-002",
       "description": "No se transmite información de calibración a servidores externos (C-001)",
-      "evidence": "Solo chrome.storage.local es usado para persistencia — sin fetch/XMLHttpRequest con datos de calibración",
-      "pass_fail": "pass"
+      "verification_method": "grep_absence",
+      "verification_command": "grep -n 'fetch\\|XMLHttpRequest' extension/content.js extension/background.js | grep -i 'calibrat'",
+      "result": "confirmed_absent",
+      "evidence": "No fetch/XHR calls with calibration data — only chrome.storage.local used for persistence"
     }
   ]
 }
