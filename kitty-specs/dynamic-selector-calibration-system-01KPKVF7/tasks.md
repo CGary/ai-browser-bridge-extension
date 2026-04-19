@@ -35,7 +35,7 @@ Both WPs share this contract, fully specified in `contracts/`.
 | T007 | Visual Picker: overlay injection + hover detection + tooltip | WP01 | [D] |
 | T008 | Visual Picker: click-capture + Escape handler + teardown | WP01 | [D] |
 | T009 | Handle ACTIVATE_VISUAL_PICKER + DEACTIVATE_VISUAL_PICKER messages | WP01 | [D] |
-| T010 | Add `broadcastToAllTabs(message)` helper in background.js | WP02 | [P] |
+| T010 | Add `broadcastToAllTabs(message)` helper in background.js | WP02 | [D] |
 | T011 | Handle `calibrate` IPC — write storage + broadcast + respond | WP02 | [P] |
 | T012 | Handle `reset-selectors` IPC — clear storage + broadcast + respond | WP02 | [P] |
 | T013 | Handle `get-active-selectors` IPC — route to tab, relay response | WP02 | [P] |
@@ -76,7 +76,7 @@ All `[P]` across WP01/WP02 = safe to execute in parallel (different files, no sh
 **Priority**: High | **Estimated size**: ~330 lines | **Prompt**: `tasks/WP02-background-script-broadcast-routing.md`
 **Owned**: `extension/background.js` | **Dependencies**: none | **Lane**: B (independent, no blocking deps)
 
-- [ ] T010 Add `broadcastToAllTabs(message)` helper in background.js (WP02)
+- [x] T010 Add `broadcastToAllTabs(message)` helper in background.js (WP02)
 - [ ] T011 Handle `calibrate` IPC — write storage + broadcast + respond (WP02)
 - [ ] T012 Handle `reset-selectors` IPC — clear storage + broadcast + respond (WP02)
 - [ ] T013 Handle `get-active-selectors` IPC — route to tab, relay response (WP02)
