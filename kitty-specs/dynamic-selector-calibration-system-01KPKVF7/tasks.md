@@ -36,7 +36,7 @@ Both WPs share this contract, fully specified in `contracts/`.
 | T008 | Visual Picker: click-capture + Escape handler + teardown | WP01 | [D] |
 | T009 | Handle ACTIVATE_VISUAL_PICKER + DEACTIVATE_VISUAL_PICKER messages | WP01 | [D] |
 | T010 | Add `broadcastToAllTabs(message)` helper in background.js | WP02 | [D] |
-| T011 | Handle `calibrate` IPC — write storage + broadcast + respond | WP02 | [P] |
+| T011 | Handle `calibrate` IPC — write storage + broadcast + respond | WP02 | [D] |
 | T012 | Handle `reset-selectors` IPC — clear storage + broadcast + respond | WP02 | [P] |
 | T013 | Handle `get-active-selectors` IPC — route to tab, relay response | WP02 | [P] |
 | T014 | Handle `visual-picker-start` IPC — route ACTIVATE_VISUAL_PICKER to target tab | WP02 | [P] |
@@ -77,7 +77,7 @@ All `[P]` across WP01/WP02 = safe to execute in parallel (different files, no sh
 **Owned**: `extension/background.js` | **Dependencies**: none | **Lane**: B (independent, no blocking deps)
 
 - [x] T010 Add `broadcastToAllTabs(message)` helper in background.js (WP02)
-- [ ] T011 Handle `calibrate` IPC — write storage + broadcast + respond (WP02)
+- [x] T011 Handle `calibrate` IPC — write storage + broadcast + respond (WP02)
 - [ ] T012 Handle `reset-selectors` IPC — clear storage + broadcast + respond (WP02)
 - [ ] T013 Handle `get-active-selectors` IPC — route to tab, relay response (WP02)
 - [ ] T014 Handle `visual-picker-start` IPC — route ACTIVATE_VISUAL_PICKER to target tab (WP02)
