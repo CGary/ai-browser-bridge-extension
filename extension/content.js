@@ -423,14 +423,14 @@ function activateVisualPicker(key, sendResponse) {
     if (!(el instanceof Element) || el === highlight || el === tooltip) return;
     const rect = el.getBoundingClientRect();
     Object.assign(highlight.style, {
-      top: `${rect.top + window.scrollY}px`,
-      left: `${rect.left + window.scrollX}px`,
+      top: `${rect.top}px`,
+      left: `${rect.left}px`,
       width: `${rect.width}px`,
       height: `${rect.height}px`,
     });
     tooltip.textContent = `[${key}] ${generateSelector(el)}`;
-    tooltip.style.top = `${Math.min(rect.bottom + window.scrollY + 6, window.innerHeight - 40)}px`;
-    tooltip.style.left = `${Math.min(rect.left + window.scrollX, window.innerWidth - 500)}px`;
+    tooltip.style.top = `${Math.min(rect.bottom + 6, window.innerHeight - 40)}px`;
+    tooltip.style.left = `${Math.min(rect.left, window.innerWidth - 500)}px`;
   };
 
   document.addEventListener("mouseover", onMouseOver, true);
