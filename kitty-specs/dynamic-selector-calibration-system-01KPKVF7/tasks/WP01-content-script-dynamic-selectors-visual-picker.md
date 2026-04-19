@@ -539,3 +539,4 @@ const SELECTORS = {
 - 2026-04-19T22:34:17Z – codex – shell_pid=1477255 – Addressed review feedback: fixed overlay positioning for scrolled pages
 - 2026-04-19T22:35:19Z – codex – shell_pid=1477255 – Started review via action command
 - 2026-04-19T22:35:30Z – codex – shell_pid=1477255 – Review passed: dynamic selectors and visual picker implementation now meets the WP contract, including scroll-safe fixed overlay positioning
+- 2026-04-19T22:46:49Z – codex – shell_pid=1477255 – Done override: WPs merged to main via spec-kitty agent mission merge — done events not recorded due to branch still active during merge
