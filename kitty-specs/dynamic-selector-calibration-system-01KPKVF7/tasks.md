@@ -39,7 +39,7 @@ Both WPs share this contract, fully specified in `contracts/`.
 | T011 | Handle `calibrate` IPC — write storage + broadcast + respond | WP02 | [D] |
 | T012 | Handle `reset-selectors` IPC — clear storage + broadcast + respond | WP02 | [D] |
 | T013 | Handle `get-active-selectors` IPC — route to tab, relay response | WP02 | [D] |
-| T014 | Handle `visual-picker-start` IPC — route ACTIVATE_VISUAL_PICKER to target tab | WP02 | [P] |
+| T014 | Handle `visual-picker-start` IPC — route ACTIVATE_VISUAL_PICKER to target tab | WP02 | [D] |
 | T015 | Handle `visual-picker-cancel` IPC — route DEACTIVATE_VISUAL_PICKER to target tab | WP02 | [P] |
 
 All `[P]` across WP01/WP02 = safe to execute in parallel (different files, no shared state).
@@ -80,7 +80,7 @@ All `[P]` across WP01/WP02 = safe to execute in parallel (different files, no sh
 - [x] T011 Handle `calibrate` IPC — write storage + broadcast + respond (WP02)
 - [x] T012 Handle `reset-selectors` IPC — clear storage + broadcast + respond (WP02)
 - [x] T013 Handle `get-active-selectors` IPC — route to tab, relay response (WP02)
-- [ ] T014 Handle `visual-picker-start` IPC — route ACTIVATE_VISUAL_PICKER to target tab (WP02)
+- [x] T014 Handle `visual-picker-start` IPC — route ACTIVATE_VISUAL_PICKER to target tab (WP02)
 - [ ] T015 Handle `visual-picker-cancel` IPC — route DEACTIVATE_VISUAL_PICKER to target tab (WP02)
 
 **Implementation sketch**:
