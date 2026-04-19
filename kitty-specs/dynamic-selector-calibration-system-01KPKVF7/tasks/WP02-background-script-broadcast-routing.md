@@ -23,7 +23,8 @@ subtasks:
 - T013
 - T014
 - T015
-shell_pid: '1520960'
+shell_pid: "1520960"
+agent: "codex"
 history:
 - date: '2026-04-19'
   agent: spec-kitty.tasks
@@ -451,3 +452,4 @@ After all subtasks are complete, the handler in `port.onMessage.addListener` mus
 ## Activity Log
 
 - 2026-04-19T22:29:24Z – unknown – shell_pid=1520960 – Moved to for_review
+- 2026-04-19T22:29:29Z – codex – shell_pid=1520960 – Started review via action command
