@@ -26,15 +26,15 @@ Both WPs share this contract, fully specified in `contracts/`.
 
 | ID | Description | WP | Parallel |
 |----|-------------|----|---------|
-| T001 | Rename `SELECTORS` → `DEFAULT_SELECTORS`; add `let activeSelectors` | WP01 | [P] |
-| T002 | Implement async `loadSelectors()` with chrome.storage.local | WP01 | [P] |
-| T003 | Update all SELECTORS.X refs → activeSelectors.X; call loadSelectors() at init | WP01 | [P] |
-| T004 | Register UPDATE_SELECTORS internal message listener | WP01 | [P] |
-| T005 | Handle `get-active-selectors` message — annotated map response | WP01 | [P] |
-| T006 | Implement `generateSelector(element)` — CSS selector generation | WP01 | [P] |
-| T007 | Visual Picker: overlay injection + hover detection + tooltip | WP01 | [P] |
-| T008 | Visual Picker: click-capture + Escape handler + teardown | WP01 | [P] |
-| T009 | Handle ACTIVATE_VISUAL_PICKER + DEACTIVATE_VISUAL_PICKER messages | WP01 | [P] |
+| T001 | Rename `SELECTORS` → `DEFAULT_SELECTORS`; add `let activeSelectors` | WP01 | [P] | [D] |
+| T002 | Implement async `loadSelectors()` with chrome.storage.local | WP01 | [D] |
+| T003 | Update all SELECTORS.X refs → activeSelectors.X; call loadSelectors() at init | WP01 | [D] |
+| T004 | Register UPDATE_SELECTORS internal message listener | WP01 | [D] |
+| T005 | Handle `get-active-selectors` message — annotated map response | WP01 | [D] |
+| T006 | Implement `generateSelector(element)` — CSS selector generation | WP01 | [D] |
+| T007 | Visual Picker: overlay injection + hover detection + tooltip | WP01 | [D] |
+| T008 | Visual Picker: click-capture + Escape handler + teardown | WP01 | [D] |
+| T009 | Handle ACTIVATE_VISUAL_PICKER + DEACTIVATE_VISUAL_PICKER messages | WP01 | [D] |
 | T010 | Add `broadcastToAllTabs(message)` helper in background.js | WP02 | [P] |
 | T011 | Handle `calibrate` IPC — write storage + broadcast + respond | WP02 | [P] |
 | T012 | Handle `reset-selectors` IPC — clear storage + broadcast + respond | WP02 | [P] |
@@ -53,15 +53,15 @@ All `[P]` across WP01/WP02 = safe to execute in parallel (different files, no sh
 **Priority**: High | **Estimated size**: ~480 lines | **Prompt**: `tasks/WP01-content-script-dynamic-selectors-visual-picker.md`
 **Owned**: `extension/content.js` | **Dependencies**: none | **Lane**: A (independent, no blocking deps)
 
-- [ ] T001 Rename `SELECTORS` → `DEFAULT_SELECTORS`; add `let activeSelectors` (WP01)
-- [ ] T002 Implement async `loadSelectors()` with chrome.storage.local (WP01)
-- [ ] T003 Update all SELECTORS.X refs → activeSelectors.X; call loadSelectors() at init (WP01)
-- [ ] T004 Register UPDATE_SELECTORS internal message listener (WP01)
-- [ ] T005 Handle `get-active-selectors` message — annotated map response (WP01)
-- [ ] T006 Implement `generateSelector(element)` — CSS selector generation (WP01)
-- [ ] T007 Visual Picker: overlay injection + hover detection + tooltip (WP01)
-- [ ] T008 Visual Picker: click-capture + Escape handler + teardown (WP01)
-- [ ] T009 Handle ACTIVATE_VISUAL_PICKER + DEACTIVATE_VISUAL_PICKER messages (WP01)
+- [x] T001 Rename `SELECTORS` → `DEFAULT_SELECTORS`; add `let activeSelectors` (WP01)
+- [x] T002 Implement async `loadSelectors()` with chrome.storage.local (WP01)
+- [x] T003 Update all SELECTORS.X refs → activeSelectors.X; call loadSelectors() at init (WP01)
+- [x] T004 Register UPDATE_SELECTORS internal message listener (WP01)
+- [x] T005 Handle `get-active-selectors` message — annotated map response (WP01)
+- [x] T006 Implement `generateSelector(element)` — CSS selector generation (WP01)
+- [x] T007 Visual Picker: overlay injection + hover detection + tooltip (WP01)
+- [x] T008 Visual Picker: click-capture + Escape handler + teardown (WP01)
+- [x] T009 Handle ACTIVATE_VISUAL_PICKER + DEACTIVATE_VISUAL_PICKER messages (WP01)
 
 **Implementation sketch**:
 1. Phase 1 — Dynamic Selector Infrastructure (T001–T005): Replace static constant, add storage layer, update all references, handle calibration reads
