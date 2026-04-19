@@ -51,17 +51,16 @@ services:
       - TZ=America/La_Paz
       - CUSTOM_USER=admin
       - PASSWORD=admin
-      - AIBBE_SOCKET_PATH=/run/aibbe/aibbe.sock
+      - AIBBE_SOCKET_PATH=/tmp/aibbe.sock
     shm_size: "1gb"
     security_opt:
       - seccomp:unconfined
     restart: unless-stopped
     volumes:
-      - ./s6-overlay:/etc/s6-overlay/s6-root/services
-      - /home/gary/dev/ai-browser-bridge-extension/daemon/aibbe-daemon:/app/aibbe-daemon:ro
+      - ../../bin/aibbe-daemon:/app/aibbe-daemon:ro
+      - ../../bin/aibbe-cli:/usr/local/bin/aibbe-cli:ro
       - ../../extension:/config/extensions/aibbe:ro
-      - ../aibbe.nm-host.docker.json:/config/.config/chromium/NativeMessagingHosts/aibbe.json:ro
-      - /tmp/aibbe-docker-socket:/run/aibbe:rw
+      - ../aibbe.nm-host.docker.json:/config/.config/google-chrome/NativeMessagingHosts/aibbe.json:ro
       - aibbe-chrome-profile:/config:rw
 
 volumes:
