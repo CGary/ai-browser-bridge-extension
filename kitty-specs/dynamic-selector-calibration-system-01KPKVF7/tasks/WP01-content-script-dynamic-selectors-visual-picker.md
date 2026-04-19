@@ -30,7 +30,8 @@ subtasks:
 - T007
 - T008
 - T009
-shell_pid: '1477255'
+shell_pid: "1477255"
+agent: "codex"
 history:
 - date: '2026-04-19'
   agent: spec-kitty.tasks
@@ -527,3 +528,7 @@ const SELECTORS = {
 3. Confirm the `generate` command (existing functionality) still works end-to-end
 4. Test `get-active-selectors` before and after a calibration — verify `source` annotation changes
 5. Test Visual Picker: activate, hover, click, Escape, cancel — all paths
+
+## Activity Log
+
+- 2026-04-19T22:18:31Z – codex – shell_pid=1477255 – Assigned agent via action command
