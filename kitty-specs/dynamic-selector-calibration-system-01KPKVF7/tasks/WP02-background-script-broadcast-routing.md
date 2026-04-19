@@ -447,3 +447,7 @@ After all subtasks are complete, the handler in `port.onMessage.addListener` mus
 3. Check that all new handlers end with `return;` — critical to prevent fall-through to existing routing.
 4. Test: calibrate with 1 key, verify other 7 keys unchanged in `get-active-selectors` response.
 5. Test: `reset-selectors` after calibrating, verify `get-active-selectors` shows all as `"default"`.
+
+## Activity Log
+
+- 2026-04-19T22:29:24Z – unknown – shell_pid=1520960 – Moved to for_review
