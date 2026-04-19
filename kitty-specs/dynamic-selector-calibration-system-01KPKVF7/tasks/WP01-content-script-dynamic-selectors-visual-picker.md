@@ -538,3 +538,4 @@ const SELECTORS = {
 - 2026-04-19T22:34:00Z – codex – shell_pid=1477255 – Started implementation via action command
 - 2026-04-19T22:34:17Z – codex – shell_pid=1477255 – Addressed review feedback: fixed overlay positioning for scrolled pages
 - 2026-04-19T22:35:19Z – codex – shell_pid=1477255 – Started review via action command
+- 2026-04-19T22:35:30Z – codex – shell_pid=1477255 – Review passed: dynamic selectors and visual picker implementation now meets the WP contract, including scroll-safe fixed overlay positioning
