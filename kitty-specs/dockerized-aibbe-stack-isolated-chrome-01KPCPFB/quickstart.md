@@ -74,7 +74,7 @@ docker compose -f configs/docker/docker-compose.yml ps
 Open your host browser and go to:
 
 ```
-http://localhost:3000
+http://localhost:9500
 ```
 
 You will see a full Chrome browser rendered via the KasmVNC web UI.

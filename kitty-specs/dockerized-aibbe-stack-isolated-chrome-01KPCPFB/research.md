@@ -70,7 +70,7 @@ The binary path in the manifest must be absolute and point to the binary's locat
 
 **Decision**: Volume-mount the host `extension/` directory into the container; load it once via Chrome's "Load unpacked" UI at the mount path. This is a one-time manual step per container instance.
 
-**Rationale**: The `linuxserver/chrome` web UI (port 3000) gives full access to Chrome's interface including DevTools and the Extensions page. Loading via volume mount means extension updates on the host are reflected inside the container on reload — no re-copy needed.
+**Rationale**: The `linuxserver/chrome` web UI (port 9500) gives full access to Chrome's interface including DevTools and the Extensions page. Loading via volume mount means extension updates on the host are reflected inside the container on reload — no re-copy needed.
 
 **Mount point inside container**: `/config/extensions/aibbe/` (writable by the Chrome user).
 

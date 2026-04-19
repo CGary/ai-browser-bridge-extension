@@ -89,12 +89,12 @@ Expected output (first run creates the named volume):
  ✔ Container docker-chrome-1  Started
 ```
 
-If port 3000 is already in use, stop the conflicting process or change the host-side port in
-`configs/docker/docker-compose.yml` (e.g., `"3001:3000"`).
+If port 9500 is already in use, stop the conflicting process or change the host-side port in
+`configs/docker/docker-compose.yml` (e.g., `"9501:3000"`).
 
 ### Step 6 — Open Chrome in the browser
 
-Open `http://localhost:3000` in your host browser. You will see the KasmVNC interface with a
+Open `http://localhost:9500` in your host browser. You will see the KasmVNC interface with a
 full Chrome instance running inside the container.
 
 ### Step 7 — Sign in to the isolated Google account

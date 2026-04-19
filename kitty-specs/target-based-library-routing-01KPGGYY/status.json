@@ -2,7 +2,7 @@
   "event_count": 18,
   "last_event_id": "01KPHBQ8FHEK9S6970B7EZ7J93",
   "materialized_at": "2026-04-18T22:34:58.929034+00:00",
-  "mission_number": "",
+  "mission_number": "3",
   "mission_slug": "target-based-library-routing-01KPGGYY",
   "mission_type": "software-dev",
   "summary": {

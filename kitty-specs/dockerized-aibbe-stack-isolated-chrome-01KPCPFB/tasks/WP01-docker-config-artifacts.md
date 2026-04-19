@@ -146,7 +146,7 @@ Extension ID (from spec): `bedlojjaiogmaefoadfpdecgajipcpgj`
    **Ports**:
    ```yaml
    ports:
-     - "3000:3000"  # KasmVNC web UI for browser access
+     - "9500:3000"  # KasmVNC web UI for browser access
    ```
 
    **Shared memory** (Chrome requires large shm for stability):
@@ -204,7 +204,7 @@ Extension ID (from spec): `bedlojjaiogmaefoadfpdecgajipcpgj`
 #
 # START:    docker compose -f configs/docker/docker-compose.yml up -d
 # STOP:     docker compose -f configs/docker/docker-compose.yml down
-# BROWSER:  http://localhost:3000
+# BROWSER:  http://localhost:9500
 
 services:
   chrome:
@@ -214,7 +214,7 @@ services:
       - PGID=1000    # Replace with: $(id -g)
       - AIBBE_SOCKET_PATH=/run/aibbe/aibbe.sock
     ports:
-      - "3000:3000"
+      - "9500:3000"
     shm_size: "1gb"
     security_opt:
       - seccomp:unconfined

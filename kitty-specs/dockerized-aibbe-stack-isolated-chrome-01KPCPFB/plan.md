@@ -114,7 +114,7 @@ Defines a single `chrome` service:
 | `PUID` | `<host-uid>` (documented placeholder — engineer sets `id -u`) |
 | `PGID` | `<host-gid>` (documented placeholder — engineer sets `id -g`) |
 | `AIBBE_SOCKET_PATH` | `/run/aibbe/aibbe.sock` |
-| Port | `3000:3000` (KasmVNC web UI) |
+| Port | `9500:3000` (KasmVNC web UI) |
 | `shm_size` | `1gb` |
 | `security_opt` | `seccomp:unconfined` |
 | `restart` | `unless-stopped` |
@@ -133,7 +133,7 @@ Defines a single `chrome` service:
 
 **Acceptance criteria**:
 - `docker compose -f configs/docker/docker-compose.yml up -d` starts without error
-- Chrome accessible at `http://localhost:3000`
+- Chrome accessible at `http://localhost:9500`
 - `/tmp/aibbe-docker-socket/` directory exists on host after container start
 
 ---
@@ -149,7 +149,7 @@ Step-by-step guide for the engineer:
 3. **Edit docker-compose.yml**: Set `PUID`, `PGID`, and absolute binary path volume
 4. **Create socket directory**: `mkdir -p /tmp/aibbe-docker-socket`
 5. **Start container**: `docker compose -f configs/docker/docker-compose.yml up -d`
-6. **Access Chrome**: Open `http://localhost:3000`
+6. **Access Chrome**: Open `http://localhost:9500`
 7. **Log in**: Sign into the isolated Google account
 8. **Load extension**: `chrome://extensions` → Developer Mode → Load unpacked → `/config/extensions/aibbe`
 9. **Verify extension**: Check background service worker console for no errors

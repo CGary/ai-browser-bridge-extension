@@ -1,32 +1,64 @@
-# Docker Compose configuration for the containerized aibbe stack.
+# Docker Compose configuration for the containerized aibbe stack with VPN decoupling.
 #
 # BEFORE RUNNING:
-#   1. Replace PUID and PGID with your host UID/GID:
-#        PUID=$(id -u)   PGID=$(id -g)
-#   2. Replace the daemon binary volume source with the absolute path to your
-#      compiled aibbe-daemon binary:
-#        go build -o ~/bin/aibbe-daemon ./daemon/
-#      Then set: /home/<you>/bin/aibbe-daemon:/app/aibbe-daemon:ro
+#   1. Get your Proton VPN OpenVPN credentials from: https://account.proton.me/
+#   2. Replace OPENVPN_USER and OPENVPN_PASSWORD below.
+#   3. Replace the daemon binary volume source with your absolute path.
 #
 # START:    docker compose -f configs/docker/docker-compose.yml up -d
 # STOP:     docker compose -f configs/docker/docker-compose.yml down
-# BROWSER:  http://localhost:3000
+# BROWSER:  http://localhost:9500 (User: admin, Pass: admin)
 
 services:
-  chrome:
-    image: linuxserver/chrome:latest
+  vpn:
+    image: qmcgaw/gluetun
+    container_name: vpn
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
     environment:
-      - PUID=1000    # Replace with: $(id -u)
-      - PGID=1000    # Replace with: $(id -g)
-      - AIBBE_SOCKET_PATH=/run/aibbe/aibbe.sock
+      - VPN_SERVICE_PROVIDER=protonvpn
+      - VPN_TYPE=openvpn
+      - OPENVPN_USER=2elIaurUr6X056uj
+      - OPENVPN_PASSWORD=YBeSDi6SyZyqza7gMD8aDZuPKhAQ020K
+      - SERVER_COUNTRIES=Netherlands
+      - TZ=America/La_Paz
+      - UPDATER_PERIOD=24h
+      - DOT=off
+      - DNS_ADDRESS=1.1.1.1
+      - FREE_ONLY=on
     ports:
-      - "3000:3000"
+      - "9500:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "https://1.1.1.1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: always
+
+  chrome:
+    container_name: chrome
+    image: linuxserver/chrome:latest
+    network_mode: "service:vpn"
+    depends_on:
+      vpn:
+        condition: service_healthy
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/La_Paz
+      - CUSTOM_USER=admin
+      - PASSWORD=admin
+      - AIBBE_SOCKET_PATH=/run/aibbe/aibbe.sock
     shm_size: "1gb"
     security_opt:
       - seccomp:unconfined
     restart: unless-stopped
     volumes:
-      - /REPLACE/WITH/ABSOLUTE/PATH/TO/aibbe-daemon:/app/aibbe-daemon:ro
+      - ./s6-overlay:/etc/s6-overlay/s6-root/services
+      - /home/gary/dev/ai-browser-bridge-extension/daemon/aibbe-daemon:/app/aibbe-daemon:ro
       - ../../extension:/config/extensions/aibbe:ro
       - ../aibbe.nm-host.docker.json:/config/.config/chromium/NativeMessagingHosts/aibbe.json:ro
       - /tmp/aibbe-docker-socket:/run/aibbe:rw
