@@ -1,7 +1,7 @@
 {
-  "event_count": 14,
-  "last_event_id": "01KPKXTJET820F1WFGVPX2RCQR",
-  "materialized_at": "2026-04-19T22:29:50.682991+00:00",
+  "event_count": 16,
+  "last_event_id": "01KPKY26A9ME3TRS67E1JM79EP",
+  "materialized_at": "2026-04-19T22:34:00.393491+00:00",
   "mission_number": "",
   "mission_slug": "dynamic-selector-calibration-system-01KPKVF7",
   "mission_type": "software-dev",
@@ -12,17 +12,17 @@
     "claimed": 0,
     "done": 0,
     "for_review": 0,
-    "in_progress": 0,
+    "in_progress": 1,
     "in_review": 0,
-    "planned": 1
+    "planned": 0
   },
   "work_packages": {
     "WP01": {
-      "actor": "user",
+      "actor": "codex",
       "force_count": 2,
-      "lane": "planned",
-      "last_event_id": "01KPKXDF4MX5D6VHW8FN3S2N2X",
-      "last_transition_at": "2026-04-19T22:22:41.300742+00:00"
+      "lane": "in_progress",
+      "last_event_id": "01KPKY26A9ME3TRS67E1JM79EP",
+      "last_transition_at": "2026-04-19T22:34:00.393491+00:00"
     },
     "WP02": {
       "actor": "user",
