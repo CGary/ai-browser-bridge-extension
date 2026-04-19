@@ -1,0 +1,192 @@
+{
+  "mission_slug": "dynamic-selector-calibration-system-01KPKVF7",
+  "mission_number": "4",
+  "mission_type": "software-dev",
+  "overall_verdict": "pass",
+  "criteria": [
+    {
+      "criterion_id": "AC-001",
+      "description": "DEFAULT_SELECTORS es const e inmutable; activeSelectors es let, inicializado como copia shallow (T001, FR-004)",
+      "proof_type": "code_review",
+      "evidence": "extension/content.js: const DEFAULT_SELECTORS = {...}; let activeSelectors = { ...DEFAULT_SELECTORS };",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-002",
+      "description": "loadSelectors() es async, siempre reinicia desde DEFAULT_SELECTORS, ignora claves desconocidas y nunca lanza (T002, FR-003)",
+      "proof_type": "code_review",
+      "evidence": "extension/content.js: async function loadSelectors() con try/catch, activeSelectors = {...DEFAULT_SELECTORS} antes de aplicar calibraciones",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-003",
+      "description": "Cero referencias a SELECTORS. en content.js (solo activeSelectors. y DEFAULT_SELECTORS.); loadSelectors() invocado en init (T003, FR-002)",
+      "proof_type": "code_review",
+      "evidence": "grep 'SELECTORS\\.' extension/content.js | grep -v 'DEFAULT_SELECTORS\\|activeSelectors' → sin resultados",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-004",
+      "description": "Listener UPDATE_SELECTORS llama loadSelectors() sin invocar sendResponse; retorna undefined (T004, FR-002)",
+      "proof_type": "code_review",
+      "evidence": "extension/content.js: handler message.type === 'UPDATE_SELECTORS' llama loadSelectors().then/catch y retorna sin return true",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-005",
+      "description": "get-active-selectors responde con todas las claves de DEFAULT_SELECTORS anotadas como 'calibration' o 'default' (T005, FR-005)",
+      "proof_type": "code_review",
+      "evidence": "extension/content.js: handler message.cmd === 'get-active-selectors' itera Object.keys(DEFAULT_SELECTORS) y asigna source según presencia en aibbe_calibrations",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-006",
+      "description": "generateSelector(element) retorna selector estable: #id > atributo > clase filtrada > nth-child; excluye clases Angular/Material (T006, FR-007)",
+      "proof_type": "code_review",
+      "evidence": "extension/content.js: function generateSelector() con filtros /^ng-|^cdk-|^mat-|tns-c/ en clases y IDs",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-007",
+      "description": "Visual Picker inyecta highlight (position:fixed, pointer-events:none) y tooltip en document.body; hover actualiza posición y texto (T007, FR-008)",
+      "proof_type": "code_review",
+      "evidence": "extension/content.js: activateVisualPicker() crea #aibbe-picker-highlight y #aibbe-picker-tooltip, listener mouseover en capture phase",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-008",
+      "description": "Click captura selector y responde {status:'success', key, selector}; Escape responde {status:'cancelled', key}; teardown elimina DOM y null _pickerSession (T008, FR-009, FR-010)",
+      "proof_type": "code_review",
+      "evidence": "extension/content.js: deactivateVisualPicker() remueve listeners y elementos antes de llamar sendResponse; onClick/onKeyDown correctamente registrados",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-009",
+      "description": "ACTIVATE_VISUAL_PICKER llama activateVisualPicker y retorna true; DEACTIVATE_VISUAL_PICKER cancela sesión activa, responde {status:'success'} y es idempotente (T009, FR-007, FR-010)",
+      "proof_type": "code_review",
+      "evidence": "extension/content.js: handlers message.type === 'ACTIVATE_VISUAL_PICKER' y 'DEACTIVATE_VISUAL_PICKER' en orden correcto dentro de onMessage",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-010",
+      "description": "broadcastToAllTabs(message) en background.js itera chrome.tabs y envía a todas las pestañas registradas (T010, FR-002)",
+      "proof_type": "code_review",
+      "evidence": "extension/background.js: función broadcastToAllTabs() usando tabRegistry para propagar UPDATE_SELECTORS",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-011",
+      "description": "Comando calibrate escribe en chrome.storage.local ('aibbe_calibrations'), broadcast UPDATE_SELECTORS a todos los tabs y responde OK (T011, FR-001, FR-002, FR-003)",
+      "proof_type": "code_review",
+      "evidence": "extension/background.js: handler 'calibrate' llama chrome.storage.local.set + broadcastToAllTabs + responde por IPC",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-012",
+      "description": "Comando reset-selectors limpia aibbe_calibrations, broadcast UPDATE_SELECTORS y responde OK; revierte a defaults sin reload (T012, FR-006)",
+      "proof_type": "code_review",
+      "evidence": "extension/background.js: handler 'reset-selectors' llama chrome.storage.local.remove + broadcastToAllTabs",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-013",
+      "description": "Comando get-active-selectors enruta a tab activo vía chrome.tabs.sendMessage y retransmite respuesta al CLI (T013, FR-005)",
+      "proof_type": "code_review",
+      "evidence": "extension/background.js: handler 'get-active-selectors' usa chrome.tabs.sendMessage al tab registrado y relay de respuesta",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-014",
+      "description": "Comando visual-picker-start enruta ACTIVATE_VISUAL_PICKER al tab objetivo; visual-picker-cancel enruta DEACTIVATE_VISUAL_PICKER (T014, T015, FR-007, FR-010)",
+      "proof_type": "code_review",
+      "evidence": "extension/background.js: handlers 'visual-picker-start' y 'visual-picker-cancel' con chrome.tabs.sendMessage y tipo de mensaje correcto",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-015",
+      "description": "Calibración parcial solo sobreescribe las claves incluidas; el resto conserva valor previo (FR-011)",
+      "proof_type": "code_review",
+      "evidence": "calibrate: chrome.storage.local.get + merge shallow (no reemplaza el objeto completo); loadSelectors: solo claves en DEFAULT_SELECTORS son aplicadas",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-016",
+      "description": "THINKING_MARKERS no es usado como señal de detección estable; RESPONSE_READY_MARKERS es el target primario (FR-012, C-004)",
+      "proof_type": "code_review",
+      "evidence": "extension/content.js: inspectLatestResponse usa activeSelectors.RESPONSE_READY_MARKERS como señal de completitud; THINKING_MARKERS solo como flag hasThinkingMarkers",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    },
+    {
+      "criterion_id": "AC-017",
+      "description": "go test ./... pasa al 100% — regresión cero en el stack Go (NFR general)",
+      "proof_type": "automated_test",
+      "evidence": "go test ./...",
+      "pass_fail": "pass",
+      "verified_by": null,
+      "verified_at": null,
+      "notes": null
+    }
+  ],
+  "negative_invariants": [
+    {
+      "invariant_id": "NI-001",
+      "description": "No hay referencias directas a SELECTORS. en content.js (solo DEFAULT_SELECTORS. y activeSelectors.)",
+      "evidence": "grep 'SELECTORS\\.' extension/content.js | grep -v 'DEFAULT_SELECTORS\\|activeSelectors' → sin resultados",
+      "pass_fail": "pass"
+    },
+    {
+      "invariant_id": "NI-002",
+      "description": "No se transmite información de calibración a servidores externos (C-001)",
+      "evidence": "Solo chrome.storage.local es usado para persistencia — sin fetch/XMLHttpRequest con datos de calibración",
+      "pass_fail": "pass"
+    }
+  ]
+}
