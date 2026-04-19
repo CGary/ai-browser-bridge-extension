@@ -532,3 +532,4 @@ const SELECTORS = {
 ## Activity Log
 
 - 2026-04-19T22:18:31Z – codex – shell_pid=1477255 – Assigned agent via action command
+- 2026-04-19T22:19:04Z – codex – shell_pid=1477255 – Ready for review
