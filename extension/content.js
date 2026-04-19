@@ -1,15 +1,24 @@
 "use strict";
 
-// Selector cascade: prefer NotebookLM's textarea, but keep contenteditable as a
-// fallback in case the provider swaps editor primitives in a future rollout.
+console.log("[aibbe] Content script version: 2026-04-19 18:30 (Jerarquías Absolutas)");
+
+// Selectors based on live DOM inspection from docs/selectores
 const SELECTORS = {
-  INPUT: 'textarea[aria-label="Query box"], textarea[aria-label="Cuadro de consulta"], textarea, div[contenteditable="true"]',
-  SUBMIT_BUTTON: 'button[aria-label="Submit"], button[aria-label="Enviar"], button[aria-label*="send"], button[type="submit"], button[data-testid*="send"]',
-  RESPONSE_CONTAINER: '.to-user-container, [data-testid*="response"], .response-container, .chat-response, .model-response',
-  RESPONSE_TEXT: '.message-text-content',
-  THINKING_MARKERS: 'thinking-animation, .thinking-message',
-  RESPONSE_READY_MARKERS: '.message-actions, .actions-container, .xap-copy-to-clipboard, .suggestions-container, .follow-up-chip',
-  CITATION_NOISE: 'button.citation-marker, button.xap-inline-dialog, [dialoglabel="Detalles de la cita"], .citation-marker, .xap-inline-dialog',
+  // Primary: exact hierarchy from user, Secondary: semantic classes/attributes
+  INPUT: 'body > labs-tailwind-root > div > notebook > div > section.chat-panel.ng-tns-c1370865089-0 > chat-panel > omnibar > div > div > div > query-box > div > div > form > div > textarea',
+  
+  SUBMIT_BUTTON: 'body > labs-tailwind-root > div > notebook > div > section.chat-panel.ng-tns-c1370865089-0 > chat-panel > omnibar > div > div > div > query-box > div > div > form > div > div > button',
+  
+  RESPONSE_CONTAINER: 'div.chat-panel-content > div > chat-message:nth-child(2) mat-card-content, mat-card-content.message-content, .to-user-container',
+  
+  RESPONSE_TEXT: 'div.message-text-content, mat-card-content > div > div, .message-content',
+  
+  THINKING_MARKERS: '.thinking-message, thinking-animation',
+  
+  RESPONSE_READY_MARKERS: '.message-actions, .xap-copy-to-clipboard, [aria-label*="copy"]',
+  
+  CITATION_NOISE: 'button.citation-marker, .citation-marker, button.xap-inline-dialog',
+  
   CODE_BLOCK: 'code, pre',
 };
 
@@ -90,7 +99,6 @@ function randomBetween(min, max) {
 async function typeWithJitter(element, text, range) {
   element.focus?.();
 
-  // Clear existing content before typing character by character.
   if (typeof document.execCommand === "function") {
     document.execCommand("selectAll", false, null);
     document.execCommand("delete", false, null);
@@ -196,10 +204,6 @@ function inspectLatestResponse() {
 function setInputValue(inputElement, payload) {
   inputElement.focus?.();
 
-  // execCommand("insertText") fires a trusted InputEvent (isTrusted: true).
-  // Angular Material's DefaultValueAccessor only updates the FormControl when
-  // it receives a trusted event — the native setter + synthetic Event dispatch
-  // writes to the DOM but leaves the FormControl invalid, keeping the button disabled.
   if (typeof document.execCommand === "function") {
     if (typeof inputElement.select === "function") {
       inputElement.select();
@@ -207,10 +211,10 @@ function setInputValue(inputElement, payload) {
       document.execCommand("selectAll", false, null);
     }
     document.execCommand("insertText", false, payload);
+    inputElement.dispatchEvent(new Event("input", { bubbles: true }));
     return;
   }
 
-  // Fallback for non-Angular environments (e.g. test harness, plain textareas).
   const nativeSetter = Object.getOwnPropertyDescriptor(
     window.HTMLTextAreaElement?.prototype,
     "value",
@@ -241,8 +245,6 @@ async function injectAndSubmit(payload) {
     const jitterRange = window.__AIBBE_JITTER_RANGE ?? [40, 120];
     await typeWithJitter(inputElement, payload, jitterRange);
   } else {
-    // setInputValue dispatches the input event internally (trusted via execCommand,
-    // or synthetic via fallback) — no extra dispatch needed here.
     setInputValue(inputElement, payload);
     await waitForNextFrame();
   }
