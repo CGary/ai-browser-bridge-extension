@@ -454,3 +454,4 @@ After all subtasks are complete, the handler in `port.onMessage.addListener` mus
 - 2026-04-19T22:29:24Z – unknown – shell_pid=1520960 – Moved to for_review
 - 2026-04-19T22:29:29Z – codex – shell_pid=1520960 – Started review via action command
 - 2026-04-19T22:29:50Z – codex – shell_pid=1520960 – Review passed: owned-file-only background routing implementation matches WP02 prompt
+- 2026-04-19T22:46:50Z – codex – shell_pid=1520960 – Done override: WPs merged to main via spec-kitty agent mission merge — done events not recorded due to branch still active during merge
