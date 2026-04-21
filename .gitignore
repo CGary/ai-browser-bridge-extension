@@ -149,5 +149,6 @@ vite.config.ts.timestamp-*
 .claudeignore
 .worktrees/
 
-# Local docker-compose with VPN credentials — never commit
-configs/docker/docker-compose.yml
+# Local secrets for docker-compose (e.g. VPN credentials)
+configs/docker/*.env
+!configs/docker/*.env.example
