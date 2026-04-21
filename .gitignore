@@ -141,7 +141,6 @@ vite.config.ts.timestamp-*
 
 # Extension private keys
 *.pem
-.codex
 
 # Spec-kitty and AI tool runtime directories
 .kittify/
