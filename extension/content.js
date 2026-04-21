@@ -37,7 +37,6 @@ async function loadSelectors() {
 }
 
 const TITLE_SELECTOR = "div.cover-title";
-const HANDSHAKE_TIMEOUT_MS = 5000;
 
 function sendHandshake(target) {
   chrome.runtime.sendMessage({
@@ -45,7 +44,7 @@ function sendHandshake(target) {
     service: "notebooklm",
     target,
   });
-  console.log(`[aibbe] Handshake sent: target=${target}`);
+  console.log(`[aibbe] Handshake sent: target=${target ?? "(pending)"}`);
 }
 
 function watchLibraryTitle(titleElement) {
@@ -67,6 +66,11 @@ function watchLibraryTitle(titleElement) {
 }
 
 function waitForLibraryTitle() {
+  // Register the tab immediately with a null target so CLI commands can route
+  // to it before the notebook title renders. The target is updated to the real
+  // title as soon as the observer sees it.
+  sendHandshake(null);
+
   const existing = document.querySelector(TITLE_SELECTOR);
   const existingText = existing?.textContent?.trim();
   if (existingText) {
@@ -75,17 +79,11 @@ function waitForLibraryTitle() {
     return;
   }
 
-  const timeoutId = setTimeout(() => {
-    observer.disconnect();
-    console.warn("[aibbe] Timed out waiting for library title — HANDSHAKE not sent");
-  }, HANDSHAKE_TIMEOUT_MS);
-
   const observer = new MutationObserver(() => {
     const el = document.querySelector(TITLE_SELECTOR);
     const text = el?.textContent?.trim();
     if (!text) return;
 
-    clearTimeout(timeoutId);
     observer.disconnect();
     sendHandshake(text);
     watchLibraryTitle(el);
