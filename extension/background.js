@@ -11,7 +11,6 @@ const VALID_SELECTOR_KEYS = new Set([
   "THINKING_MARKERS",
   "RESPONSE_READY_MARKERS",
   "CITATION_NOISE",
-  "CODE_BLOCK",
 ]);
 const tabRegistry = new Map();
 

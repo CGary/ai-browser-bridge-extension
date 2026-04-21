@@ -10,7 +10,6 @@ const SELECTORS = {
   RESPONSE_READY_MARKERS: 'mat-card-actions.message-actions',
   THINKING_MARKERS:       'thinking-animation, .loading-spinner, [class*="thinking"]',
   CITATION_NOISE:         'button.citation-marker, .xap-inline-dialog',
-  CODE_BLOCK:             'code, pre',
 };
 
 let activeSelectors = { ...SELECTORS };
@@ -202,10 +201,7 @@ function inspectLatestResponse() {
 
   const latestResponse = responseContainers[responseContainers.length - 1];
   const contentRoot = latestResponse.querySelector(activeSelectors.RESPONSE_TEXT) || latestResponse;
-  const codeBlocks = contentRoot.querySelectorAll(activeSelectors.CODE_BLOCK);
-  const result = (codeBlocks.length > 0
-    ? codeBlocks[codeBlocks.length - 1].textContent
-    : extractCleanTextFromNode(contentRoot)) || "";
+  const result = extractCleanTextFromNode(contentRoot) || "";
 
   // READY/THINKING markers are siblings of the response container inside the enclosing chat-message.
   const messageScope = latestResponse.closest("chat-message") || latestResponse.parentElement || latestResponse;
