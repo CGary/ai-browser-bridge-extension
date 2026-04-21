@@ -1,9 +1,12 @@
 # Docker Compose configuration for the containerized aibbe stack with VPN decoupling.
 #
-# BEFORE RUNNING:
-#   1. Get your Proton VPN OpenVPN credentials from: https://account.proton.me/
-#   2. Replace OPENVPN_USER and OPENVPN_PASSWORD below.
-#   3. Replace the daemon binary volume source with your absolute path.
+# SETUP:
+#   1. Copy this file to docker-compose.yml (next to this file).
+#   2. Get your Proton VPN OpenVPN credentials from: https://account.proton.me/
+#   3. Replace OPENVPN_USER and OPENVPN_PASSWORD placeholders below.
+#   4. Replace the daemon binary volume source with your absolute path if needed.
+#
+# docker-compose.yml is git-ignored on purpose — never commit your credentials.
 #
 # START:    docker compose -f configs/docker/docker-compose.yml up -d
 # STOP:     docker compose -f configs/docker/docker-compose.yml down
@@ -20,8 +23,8 @@ services:
     environment:
       - VPN_SERVICE_PROVIDER=protonvpn
       - VPN_TYPE=openvpn
-      - OPENVPN_USER=2elIaurUr6X056uj
-      - OPENVPN_PASSWORD=YBeSDi6SyZyqza7gMD8aDZuPKhAQ020K
+      - OPENVPN_USER=REPLACE_WITH_YOUR_PROTON_OPENVPN_USER
+      - OPENVPN_PASSWORD=REPLACE_WITH_YOUR_PROTON_OPENVPN_PASSWORD
       - SERVER_COUNTRIES=Netherlands
       - TZ=America/La_Paz
       - UPDATER_PERIOD=24h

@@ -148,3 +148,6 @@ vite.config.ts.timestamp-*
 .claude/
 .claudeignore
 .worktrees/
+
+# Local docker-compose with VPN credentials — never commit
+configs/docker/docker-compose.yml
