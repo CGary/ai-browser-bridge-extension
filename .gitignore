@@ -151,3 +151,5 @@ vite.config.ts.timestamp-*
 # Local secrets for docker-compose (e.g. VPN credentials)
 configs/docker/*.env
 !configs/docker/*.env.example
+
+rag/

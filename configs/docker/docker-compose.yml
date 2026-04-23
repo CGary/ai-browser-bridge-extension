@@ -61,6 +61,7 @@ services:
       - ../../bin/aibbe-daemon:/app/aibbe-daemon:ro
       - ../../bin/aibbe-cli:/usr/local/bin/aibbe-cli:ro
       - ../../extension:/config/extensions/aibbe:ro
+      - ../../rag:/config/rag
       - ../aibbe.nm-host.docker.json:/config/.config/google-chrome/NativeMessagingHosts/aibbe.json:ro
       - aibbe-chrome-profile:/config:rw
 
