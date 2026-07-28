@@ -1,47 +1,26 @@
-# Propuesta Técnica: Sistema de Calibración Dinámica de Selectores (DCS)
+# Calibración dinámica de selectores — estado y propuesta pendiente
 
-## 1. El Problema
-El ciclo actual de desarrollo para adaptar la extensión a cambios en el DOM de NotebookLM es ineficiente:
-`Inspeccionar -> Editar Código -> Recargar Extensión -> Refrescar Pestaña -> Probar`.
-Cualquier cambio menor en la UI de Google (clases CSS generadas dinámicamente) rompe la integración y requiere intervención manual en el código fuente.
+## Estado: Fase 1 IMPLEMENTADA ✅
 
-## 2. La Solución: Arquitectura de Overrides
-Transformar los selectores de constantes estáticas en el código a un sistema de **configuración persistente y en tiempo real**.
+El sistema de calibración dinámica propuesto originalmente en este documento ya está en
+producción. Referencia rápida de lo implementado:
 
-### 2.1. Almacenamiento y Precedencia
-La extensión utilizará `chrome.storage.local` para gestionar los selectores. El orden de prioridad será:
-1.  **Local Storage (Calibraciones):** Selectores guardados por el usuario/CLI.
-2.  **Código Fuente (Defaults):** Selectores base definidos en `content.js`.
+- **Persistencia de overrides**: clave `aibbe_calibrations` en `chrome.storage.local`
+  (`extension/background.js`), con cascada calibración → defaults del código en
+  `extension/content.js` (`loadSelectors()` / `activeSelectors`).
+- **Actualización en caliente sin recarga**: `background.js` hace broadcast de
+  `UPDATE_SELECTORS` a todas las pestañas; `content.js` lo escucha y aplica.
+- **Comandos IPC**: `calibrate`, `reset-selectors`, `get-active-selectors`,
+  `probe-selectors` — documentados en el README (secciones "Comandos disponibles" y
+  "Flujo de calibración").
 
-### 2.2. Flujo de Trabajo Dinámico (Sin Recargas)
-1.  El **Daemon** recibe un comando de calibración desde la CLI.
-2.  El **Background Script** envía los nuevos selectores a todas las pestañas registradas.
-3.  El **Content Script** actualiza su objeto `SELECTORS` en memoria inmediatamente y lo guarda en `chrome.storage`.
-4.  **Resultado:** Los siguientes comandos de inyección usan los nuevos selectores sin necesidad de recargar la extensión ni la página.
+Claves calibrables: `INPUT`, `SUBMIT_BUTTON`, `RESPONSE_CONTAINER`, `RESPONSE_TEXT`,
+`THINKING_MARKERS`, `RESPONSE_READY_MARKERS`, `CITATION_NOISE`.
 
-## 3. Implementación Técnica
+## Propuesta pendiente: Fase 2 — Visual Picker
 
-### 3.1. Nuevos Comandos IPC
-- `calibrate`: Recibe un JSON con los selectores a actualizar (ej. `{"INPUT": ".new-class"}`).
-- `reset-selectors`: Borra todas las calibraciones y vuelve a los valores de fábrica del código.
-- `get-active-selectors`: Devuelve los selectores que se están usando actualmente (útil para depuración).
-
-### 3.2. Cambios en Content Script
-- Sustituir `const SELECTORS` por una variable `let activeSelectors`.
-- Implementar una función `loadSelectors()` que se ejecute al inicio y tras recibir mensajes de calibración.
-- Escuchar mensajes del tipo `UPDATE_SELECTORS`.
-
-### 3.3. Interacción vía CLI
-Se habilitará un nuevo modo en `aibbe-cli`:
-```bash
-# Ejemplo de calibración rápida desde terminal
-./aibbe-cli -cmd "calibrate" -payload '{"INPUT": "#new-input-id", "SUBMIT_BUTTON": ".btn-send"}'
-```
-
-## 4. Beneficios
-1.  **Productividad:** Tiempo de ajuste reducido de minutos a segundos.
-2.  **Resiliencia:** Permite corregir la extensión en entornos de producción (Docker) sin tocar archivos ni reconstruir imágenes.
-3.  **Agnosticismo:** Facilita la adaptación de la extensión a otros servicios de IA (Claude, Gemini, ChatGPT) simplemente cambiando los selectores sobre la marcha.
-
-## 5. Próximos Pasos (Fase 2)
-Una vez establecida la persistencia, se implementará el **Visual Picker**: un comando que resalta elementos en la página de NotebookLM y permite al usuario seleccionarlos haciendo clic, auto-generando el selector óptimo.
+Única parte aún NO implementada: un comando que resalta elementos en la página de
+NotebookLM y permite al usuario seleccionarlos haciendo clic, auto-generando el selector
+óptimo (evitando clases generadas `ng-*`, `mat-mdc-*`, `cdk-*` y prefiriendo clases
+semánticas estables). Eliminaría la necesidad de inspeccionar el DOM manualmente en
+DevTools durante una recalibración.

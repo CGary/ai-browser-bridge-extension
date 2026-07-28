@@ -153,3 +153,5 @@ configs/docker/*.env
 !configs/docker/*.env.example
 
 rag/
+# Compiled binaries (mounted by docker-compose; build locally)
+bin/

@@ -66,22 +66,19 @@ Claves válidas para `calibrate`: `INPUT`, `SUBMIT_BUTTON`, `RESPONSE_CONTAINER`
 Setup completo con Chromium aislado en contenedor: ver [`docs/quickstart-docker.md`](docs/quickstart-docker.md). Resumen:
 
 ```bash
-# 1. Compilar daemon para linux/amd64
-GOOS=linux GOARCH=amd64 go build -o ~/bin/aibbe-daemon ./daemon/
+# 1. Compilar binarios para linux/amd64 (el compose los monta desde bin/)
+GOOS=linux GOARCH=amd64 go build -o bin/aibbe-daemon ./daemon/
+GOOS=linux GOARCH=amd64 go build -o bin/aibbe-cli ./cmd/cli/
 
-# 2. Editar configs/docker/docker-compose.yml: PUID, PGID, path del daemon
+# 2. Credenciales VPN (ProtonVPN OpenVPN; vpn.env queda git-ignorado)
+cp configs/docker/vpn.env.example configs/docker/vpn.env  # y completarlo
 
-# 3. Levantar el stack
-mkdir -p /tmp/aibbe-docker-socket
+# 3. Levantar el stack (servicios: vpn + chrome)
 docker compose -f configs/docker/docker-compose.yml up -d
 
 # 4. Cargar la extensión en Chrome (http://localhost:9500) desde /config/extensions/aibbe
 
-# 5. Usar CLI desde el host
-AIBBE_SOCKET_PATH=/tmp/aibbe-docker-socket/aibbe.sock \
-  ./aibbe-cli -cmd generate -payload "hola"
-
-# ... o desde dentro del contenedor
+# 5. Usar el CLI dentro del contenedor (el socket vive dentro del container)
 docker exec chrome aibbe-cli -cmd generate -payload "hola"
 ```
 

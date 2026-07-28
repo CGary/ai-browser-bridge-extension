@@ -1,103 +1,80 @@
-<!-- Verified against configs/docker/docker-compose.yml and configs/aibbe.nm-host.docker.json on 2026-04-17 -->
-
 # Quickstart: Dockerized aibbe Stack
 
 ## Overview
 
 This guide sets up the full aibbe automation stack (daemon + Chrome extension) inside a
-`linuxserver/chrome` Docker container, linked to a fresh Google account isolated from your
-primary account. The host CLI communicates with the containerized daemon through a Unix socket
-bind-mounted from the host — requiring **zero changes to the CLI binary**. The Chrome profile
-(login state, extension data) persists across container restarts via a Docker named volume, so
-you only log in once.
+`linuxserver/chrome` Docker container whose traffic is routed through a VPN container
+(gluetun + ProtonVPN), linked to a fresh Google account isolated from your primary account.
+The daemon runs inside the container and listens on `/tmp/aibbe.sock` **inside the container's
+filesystem**, so the CLI is used via `docker exec`. The Chrome profile (login state, extension
+data) persists across container restarts via a Docker named volume, so you only log in once.
+
+The compose stack defines two services:
+
+- `vpn` (`qmcgaw/gluetun`): OpenVPN tunnel to ProtonVPN. Exposes port `9500` for the browser UI.
+- `chrome` (`linuxserver/chrome`): shares the VPN's network namespace (`network_mode: service:vpn`)
+  and only starts once the VPN is healthy.
 
 ---
 
 ## Prerequisites
 
-- Docker Engine 24+ installed on Debian 12 (or compatible Linux)
-- Go 1.21+ installed (for compiling the daemon)
+- Docker Engine 24+ on Linux
+- Go 1.21+ (for compiling daemon and CLI)
 - The repository cloned at a known absolute path
-- A separate Google account (not your primary account) — create one at accounts.google.com
+- A separate Google account (not your primary account)
+- Proton VPN OpenVPN credentials (free tier works — the compose sets `FREE_ONLY=on`)
 
 ---
 
 ## Step-by-step Setup
 
-### Step 1 — Compile the daemon binary
+### Step 1 — Compile the binaries into `bin/`
 
-The container runs Linux amd64. Always compile for that target.
-
-```bash
-# Standard (host is Linux amd64):
-go build -o ~/bin/aibbe-daemon ./daemon/
-
-# Cross-compile (if host is not Linux amd64):
-GOOS=linux GOARCH=amd64 go build -o ~/bin/aibbe-daemon ./daemon/
-```
-
-Verify: `ls -lh ~/bin/aibbe-daemon` — should show a non-zero file size.
-
-### Step 2 — Find your host UID and GID
+The compose file bind-mounts `bin/aibbe-daemon` and `bin/aibbe-cli` from the repository root.
+The container runs Linux amd64 — always compile for that target.
 
 ```bash
-id -u   # Example output: 1000
-id -g   # Example output: 1000
+GOOS=linux GOARCH=amd64 go build -o bin/aibbe-daemon ./daemon/
+GOOS=linux GOARCH=amd64 go build -o bin/aibbe-cli ./cmd/cli/
 ```
 
-Keep these values handy. A UID/GID mismatch between the host user and the container is the
-most common setup error — it prevents the host CLI from writing to the socket.
+`bin/` is git-ignored; these binaries only live on your machine.
 
-### Step 3 — Configure docker-compose.yml
-
-Edit `configs/docker/docker-compose.yml`. Make exactly three substitutions:
-
-1. Replace `PUID=1000` with your UID from Step 2.
-2. Replace `PGID=1000` with your GID from Step 2.
-3. Replace `/REPLACE/WITH/ABSOLUTE/PATH/TO/aibbe-daemon` with the absolute path to the
-   binary compiled in Step 1.
-
-Example after editing (your values will differ):
-
-```yaml
-- PUID=1000          # your actual UID
-- PGID=1000          # your actual GID
-...
-- /home/youruser/bin/aibbe-daemon:/app/aibbe-daemon:ro
-```
-
-### Step 4 — Create the socket directory
-
-Docker bind-mounts require the source directory to exist on the host before the container
-starts.
+### Step 2 — Configure VPN credentials
 
 ```bash
-mkdir -p /tmp/aibbe-docker-socket
+cp configs/docker/vpn.env.example configs/docker/vpn.env
+# Edit configs/docker/vpn.env with your Proton VPN OpenVPN username/password
+# (get them at https://account.proton.me/ → OpenVPN/IKEv2 credentials)
 ```
 
-### Step 5 — Start the container
+`configs/docker/*.env` is git-ignored — secrets stay local. Without this file,
+`docker compose up` fails.
+
+### Step 3 — Check PUID/PGID (usually no edit needed)
+
+The compose sets `PUID=1000` / `PGID=1000`. If `id -u` / `id -g` on your host differ,
+update those values in `configs/docker/docker-compose.yml`.
+
+### Step 4 — Start the stack
 
 ```bash
 docker compose -f configs/docker/docker-compose.yml up -d
 ```
 
-Expected output (first run creates the named volume):
+This starts two containers: `vpn` first (waits for its healthcheck against `1.1.1.1`),
+then `chrome`. First run also creates the `aibbe-chrome-profile` named volume.
 
-```
-[+] Running 2/2
- ✔ Volume "aibbe-chrome-profile" Created
- ✔ Container docker-chrome-1  Started
-```
+If port 9500 is already in use, change the host-side port on the `vpn` service
+(e.g., `"9501:3000"`).
 
-If port 9500 is already in use, stop the conflicting process or change the host-side port in
-`configs/docker/docker-compose.yml` (e.g., `"9501:3000"`).
+### Step 5 — Open Chrome in the browser
 
-### Step 6 — Open Chrome in the browser
+Open `http://localhost:9500` (user `admin`, pass `admin`). You will see the KasmVNC
+interface with a full Chrome instance running inside the container.
 
-Open `http://localhost:9500` in your host browser. You will see the KasmVNC interface with a
-full Chrome instance running inside the container.
-
-### Step 7 — Sign in to the isolated Google account
+### Step 6 — Sign in to the isolated Google account
 
 Inside the container's Chrome:
 
@@ -105,84 +82,67 @@ Inside the container's Chrome:
 2. Sign in with the **isolated** Google account — not your primary account.
 3. Complete any 2FA or account-verification steps.
 
-This session is persisted in the `aibbe-chrome-profile` Docker named volume.
+This session persists in the `aibbe-chrome-profile` named volume.
 
-### Step 8 — Load the extension
+### Step 7 — Load the extension
 
 Inside the container's Chrome:
 
 1. Navigate to `chrome://extensions`.
-2. Enable **Developer mode** (toggle in the top-right corner of the page).
-3. Click **Load unpacked**.
-4. Enter the path `/config/extensions/aibbe` — this is where the extension source is
-   volume-mounted from `./extension/` in the repository.
-5. Confirm the "AI Browser Bridge Extension" appears in the extension list with no errors.
+2. Enable **Developer mode**.
+3. Click **Load unpacked** and enter `/config/extensions/aibbe` (volume-mounted from
+   `./extension/` in the repository).
+4. Confirm the extension appears with no errors and with ID
+   `bedlojjaiogmaefoadfpdecgajipcpgj`.
 
-This step is required only once. After the first load, the extension installation persists in
-the named volume across container restarts.
+Required only once — the installation persists in the named volume.
 
-### Step 9 — Verify the extension loaded correctly
+### Step 8 — Verify the native messaging host
 
-1. In `chrome://extensions`, click the **Service Worker** link under the AI Browser Bridge
-   Extension entry.
-2. The DevTools console for the background service worker opens.
-3. You should see a connection log line when Chrome launches the native messaging host.
+1. In `chrome://extensions`, click the **Service worker** link under the extension entry.
+2. You should see a connection log line when Chrome launches the native host.
 
-If you see errors:
+If you see **"Native host not found"**: the manifest is mounted at
+`/config/.config/google-chrome/NativeMessagingHosts/aibbe.json` (note: `google-chrome`,
+not `chromium` — the image runs Google Chrome). Confirm the compose volume bind for
+`../aibbe.nm-host.docker.json` and restart the container.
 
-- **"Native host not found"**: The manifest at
-  `/config/.config/chromium/NativeMessagingHosts/aibbe.json` is missing or has a wrong path.
-  Confirm the compose volume bind for `../aibbe.nm-host.docker.json` is correct and the
-  container was restarted after editing `docker-compose.yml`.
-- **Extension ID mismatch**: The ID shown in `chrome://extensions` must match the
-  `allowed_origins` value in `configs/aibbe.nm-host.docker.json`. If the extension was
-  side-loaded with a different profile, the ID may differ — note the displayed ID and update
-  the manifest file.
+### Step 9 — Test the CLI round-trip
 
-### Step 10 — Test the CLI round-trip
-
-From the **host machine** terminal (not inside the container):
+Open a NotebookLM notebook in the container's Chrome, then from the host:
 
 ```bash
-AIBBE_SOCKET_PATH=/tmp/aibbe-docker-socket/aibbe.sock \
-  go run cmd/cli/main.go -cmd ping -payload hello
+docker exec chrome aibbe-cli -cmd probe-selectors
+docker exec chrome aibbe-cli -cmd generate -payload "hola"
 ```
 
-Expected output (the daemon relays the request through the extension, which echoes it back):
+The daemon socket (`/tmp/aibbe.sock`) lives **inside** the container, so the CLI must run
+there too. The compose file does not bind-mount the socket to the host.
 
-```json
-{"cmd":"ping","payload":"hello"}
-```
+If the CLI exits with code 1 or hangs, see Troubleshooting below.
 
-The daemon acts as a transparent relay — it forwards any command to the extension and returns
-whatever the extension sends back. The current extension echoes requests unchanged, so the
-round-trip output mirrors the input.
-
-If the CLI exits with code 1 or hangs, see the Troubleshooting section below.
-
-### Step 11 — Stopping the container
+### Step 10 — Stopping the stack
 
 ```bash
 docker compose -f configs/docker/docker-compose.yml down
 ```
 
-The `aibbe-chrome-profile` named volume is **preserved** — your login session and extension
+The `aibbe-chrome-profile` named volume is **preserved** — login session and extension
 installation survive the stop.
 
 > **Warning**: Do **not** run `docker compose down -v`. The `-v` flag deletes named volumes,
-> which would destroy your Chrome profile and require you to repeat Steps 7–8.
+> destroying the Chrome profile (repeat Steps 6–7 to recover).
 
-### Step 12 — Updating the daemon binary
+### Step 11 — Updating the binaries
 
-Recompile on the host (repeat Step 1), then restart the container:
+Recompile on the host (Step 1), then restart the chrome container:
 
 ```bash
-go build -o ~/bin/aibbe-daemon ./daemon/
+GOOS=linux GOARCH=amd64 go build -o bin/aibbe-daemon ./daemon/
 docker compose -f configs/docker/docker-compose.yml restart chrome
 ```
 
-No image rebuild is needed. The binary is bind-mounted from the host, so the container picks
-up the new version on the next Chrome launch.
+No image rebuild needed — the binaries are bind-mounted.
 
 ---
 
@@ -190,31 +150,24 @@ up the new version on the next Chrome launch.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| CLI exits 1 immediately: "no such file" or "connection refused" | Container not running | `docker compose -f configs/docker/docker-compose.yml ps` — start if stopped |
-| CLI exits 1: socket path not found | Socket directory missing or wrong `AIBBE_SOCKET_PATH` | `mkdir -p /tmp/aibbe-docker-socket`; verify env var |
-| CLI hangs indefinitely, then times out | UID/GID mismatch — socket owned by different user | Confirm `PUID`/`PGID` in compose match `id -u` / `id -g` on host |
-| Chrome crashes on launch inside container | Shared memory too small | `shm_size: "1gb"` is set; increase to `"2gb"` if crashes persist |
-| "Native host not found" in extension console | Manifest not mounted at correct path | Confirm `../aibbe.nm-host.docker.json` volume bind; restart container |
-| Extension missing after container restart | Extension loaded into ephemeral layer, not named volume | Ensure `aibbe-chrome-profile:/config:rw` volume is mounted — reload extension if needed |
+| `docker compose up` fails reading `vpn.env` | Missing VPN credentials file | Step 2: copy `vpn.env.example` → `vpn.env` and fill it in |
+| `chrome` container never starts | VPN healthcheck failing (bad credentials, no tunnel) | `docker logs vpn`; verify ProtonVPN OpenVPN credentials |
+| CLI: "connection refused" / "no such file" | Daemon not running inside container, or CLI run on the host | Run via `docker exec chrome aibbe-cli ...`; check container status |
+| `no_free_tabs` | No NotebookLM tab registered via handshake | Open/refresh a notebook tab in the container's Chrome |
+| Chrome crashes on launch inside container | Shared memory too small | `shm_size: "1gb"` is set; increase to `"2gb"` if it persists |
+| "Native host not found" in extension console | Manifest not mounted at the `google-chrome` path | See Step 8; restart container after compose edits |
+| Extension missing after restart | Profile volume not mounted | Ensure `aibbe-chrome-profile:/config:rw` is present |
 
 ---
 
 ## Session Persistence
 
-The `aibbe-chrome-profile` Docker named volume stores the entire `/config` directory inside
-the container. This includes:
+The `aibbe-chrome-profile` named volume stores the entire `/config` directory:
+Chrome user profile (cookies, login state), the loaded extension, and calibration
+overrides in `chrome.storage.local`.
 
-- The Chromium user profile (cookies, session tokens, login state)
-- The installed extension (loaded via Developer Mode in Step 8)
-- Any other Chrome configuration
-
-A container restart (`docker compose down` followed by `up -d`) automatically restores the
-profile from the named volume. You do not need to log in again as long as the volume exists.
-
-If the volume is accidentally deleted (`docker volume rm aibbe-chrome-profile` or
-`docker compose down -v`), repeat Steps 7 and 8 to restore the session.
-
-To list your Docker volumes and confirm the profile volume exists:
+A restart (`down` + `up -d`) restores everything automatically. If the volume is deleted,
+repeat Steps 6–7.
 
 ```bash
 docker volume ls | grep aibbe
