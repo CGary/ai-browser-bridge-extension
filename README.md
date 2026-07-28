@@ -47,7 +47,7 @@ Cada pestaña de NotebookLM, al cargar el content script, envía un `HANDSHAKE` 
 - Sin flag `-target`: el daemon encuentra la primera pestaña libre.
 - Con `-target "nombre del notebook"`: rutea a la pestaña cuyo título coincide exactamente.
 
-Para que el CLI pueda rutear aún antes de que aparezca el título, el content script envía un handshake inicial con `target=null` y luego lo actualiza cuando el título renderiza.
+Para que el CLI pueda rutear aún antes de que aparezca el título, el content script envía un handshake inicial con `target=null` y luego lo actualiza cuando el título renderiza. El nombre se toma de `div.cover-title` si existe; si esa clase cambia (UI de "Gemini Notebook"), cae al `<title>` de la página quitando el sufijo de marca (`"Siat - Gemini Notebook"` → `"Siat"`).
 
 ## Comandos disponibles
 

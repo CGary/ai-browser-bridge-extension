@@ -37,6 +37,18 @@ async function loadSelectors() {
 
 const TITLE_SELECTOR = "div.cover-title";
 
+// The page <title> is "<notebook name> - <brand>". Brand observed as
+// "Gemini Notebook" (notebook.google.com) and "NotebookLM" (legacy domain).
+// Used as target source when TITLE_SELECTOR no longer matches the DOM.
+const DOC_TITLE_BRAND = /\s+-\s+(Gemini Notebook|NotebookLM)$/;
+
+function titleFromDocument() {
+  const raw = document.title?.trim();
+  if (!raw || !DOC_TITLE_BRAND.test(raw)) return null;
+  const name = raw.replace(DOC_TITLE_BRAND, "").trim();
+  return name || null;
+}
+
 function sendHandshake(target) {
   chrome.runtime.sendMessage({
     type: "HANDSHAKE",
@@ -78,17 +90,48 @@ function waitForLibraryTitle() {
     return;
   }
 
+  // Fallback source: derive the notebook name from the page <title>. Keeps
+  // target routing alive when the in-page title element changes class names.
+  const docName = titleFromDocument();
+  if (docName) {
+    sendHandshake(docName);
+  }
+  const docTitleObserver = watchDocumentTitle(docName);
+
   const observer = new MutationObserver(() => {
     const el = document.querySelector(TITLE_SELECTOR);
     const text = el?.textContent?.trim();
     if (!text) return;
 
     observer.disconnect();
+    docTitleObserver?.disconnect();
     sendHandshake(text);
     watchLibraryTitle(el);
   });
 
   observer.observe(document.body, { childList: true, subtree: true });
+}
+
+function watchDocumentTitle(initialName) {
+  const titleElement = document.querySelector("title");
+  if (!titleElement) return null;
+
+  let lastName = initialName;
+  const observer = new MutationObserver(() => {
+    const name = titleFromDocument();
+    if (name && name !== lastName) {
+      lastName = name;
+      sendHandshake(name);
+    }
+  });
+
+  observer.observe(titleElement, {
+    childList: true,
+    characterData: true,
+    subtree: true,
+  });
+
+  return observer;
 }
 
 if (typeof document !== "undefined" && typeof MutationObserver !== "undefined") {
