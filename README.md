@@ -4,7 +4,7 @@
 
 Puente de automatización entre una CLI/daemon en Go y **NotebookLM** (Google) corriendo en un navegador Chromium. Permite a un agente externo enviar prompts, leer respuestas y ajustar selectores DOM en caliente, sin recargar la extensión.
 
-La extensión está acoplada a NotebookLM (el content script sólo matchea `https://notebooklm.google.com/*`). El resto del stack (CLI, daemon, protocolo) es agnóstico de servicio.
+La extensión está acoplada a NotebookLM (el content script sólo matchea `https://notebooklm.google.com/*` y `https://notebook.google.com/*` — Google migró NotebookLM a este último dominio). El resto del stack (CLI, daemon, protocolo) es agnóstico de servicio.
 
 ## Arquitectura
 
@@ -136,7 +136,7 @@ aibbe-cli -cmd reset-selectors
 - **Version**: 0.1.0
 - **ID estático**: `bedlojjaiogmaefoadfpdecgajipcpgj` (fijado vía `key` en el manifest)
 - **Permisos**: `nativeMessaging`, `storage`, `tabs`
-- **Host matches**: `https://notebooklm.google.com/*`
+- **Host matches**: `https://notebooklm.google.com/*`, `https://notebook.google.com/*`
 - **Native host name**: `aibbe`
 
 ## Decisiones de diseño

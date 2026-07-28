@@ -45,7 +45,7 @@ go run cmd/cli/main.go -cmd generate -target "Notebook title" -payload "some pro
 
 ## Architecture
 
-Automation bridge between a Go CLI/daemon and **NotebookLM** running in a Chromium browser. The extension is coupled to NotebookLM (content script only matches `https://notebooklm.google.com/*`); CLI, daemon, and protocol are service-agnostic.
+Automation bridge between a Go CLI/daemon and **NotebookLM** running in a Chromium browser. The extension is coupled to NotebookLM (content script only matches `https://notebooklm.google.com/*` and `https://notebook.google.com/*` — Google migrated NotebookLM to the latter domain); CLI, daemon, and protocol are service-agnostic.
 
 ```
 CLI (ephemeral)  ──JSON/Unix socket──►  Daemon (resident)  ──4-byte LE + JSON──►  Extension SW  ──tabs.sendMessage──►  content.js (NotebookLM tab)
