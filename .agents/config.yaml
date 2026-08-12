@@ -1,0 +1,109 @@
+levels:
+  0:
+    use_for:
+      - feature_execution
+      - tests
+      - docs
+      - mechanical_refactor
+    # 2026-08-09 (human decision, free-first ordering): the $0 OpenRouter
+    # free cells lead the chain and the Gemini-subscription cells close it,
+    # preserving subscription quota for interactive/orchestration use.
+    # NOTE: this supersedes the earlier G1 note that required the fallback
+    # to be cross-provider from the primary -- primary and fallback are now
+    # BOTH opencode/OpenRouter free cells (shared 20 req/min + daily quota,
+    # a rate-limit hits both together); the cross-provider jump now happens
+    # at secondary (agy_edit, subscription). core.Route still enumerates
+    # primary -> fallback -> secondary in fixed order.
+    # 3.5-flash-low is exposed on agy_edit (agentic smoke pass 2026-08-09)
+    # and sits LAST as the subscription backstop.
+    # 2026-08-09: laguna-m.1 was removed from OpenRouter (2.1 series replaced
+    # it; probes errored) -> swapped for poolside/laguna-s-2.1-free here and
+    # in level 1.
+    primary: nvidia/nemotron-3-ultra-550b-a55b-free
+    fallback: poolside/laguna-s-2.1-free
+    secondary:
+      - openai/gpt-oss-120b
+      - google/gemini-3.5-flash-low
+    # max_cost_per_call_usd only binds transports with quota_class: api (ADR-A).
+    max_cost_per_call_usd: 0.15
+
+  1:
+    use_for:
+      - review
+      - diagnose_verify_failure
+      - small_corrections
+    # Rebuilt 2026-07-31 after the hexcell-2 audit: this level owns {low,M},
+    # {medium,S} and {medium,M} -- the band most SDC tasks land in -- yet its
+    # chain resolved to nothing routable (codex disabled by kill-switch since
+    # 2026-07-27; the old google/gemini-3.1-pro-low fallback lives only on the
+    # oneshot `agy` transport, which core.Route excludes from implement), so
+    # every level-1 implement fell back to an internal Claude subagent.
+    # 2026-08-09 (human decision, free-first ordering): same rationale as
+    # level 0 -- $0 OpenRouter free cells lead, the Gemini-subscription
+    # cell (3.6-flash-low) closes the live chain as the subscription
+    # backstop. 3.6-flash-medium stays in the agy/agy_edit catalogs for
+    # fleet run but is no longer routed. Primary/fallback are both
+    # opencode/OpenRouter (shared rate limit); cross-provider jump happens
+    # at secondary. The codex cells stay reachable but last: that account
+    # is retired (kill-switch 2026-07-27) and its free credits are finite.
+    primary: poolside/laguna-s-2.1-free
+    fallback: nvidia/nemotron-3-ultra-550b-a55b-free
+    secondary:
+      - openai/gpt-oss-120b
+      - google/gemini-3.6-flash-low
+      - openai/gpt-5.5-medium
+      - openai/gpt-5.6-terra-medium
+      - openai/gpt-5.6-luna-medium
+    max_cost_per_call_usd: 0.50
+
+  2:
+    use_for:
+      - surgical_cartography
+      - high_risk_arch
+      - ambiguous_features
+      - migrations
+      - security
+    # 2026-08-09 (human decision): gemini-3.6-flash-high is the level-2
+    # primary, completing the flash trio across the ladder (low->0,
+    # medium->1, high->2); claude-opus-4-6 (also agy_edit, subscription)
+    # is the fallback. Before this change every non-primary cell in this
+    # level was codex-backed and codex has been kill-switched since
+    # 2026-07-27 (quota exhausted, disabled until further notice), so
+    # level 2 had exactly one routable candidate and no reroute path
+    # (same latent bug shape the level-1 rebuild fixed). The codex cells
+    # stay last for if/when that account returns.
+    primary: google/gemini-3.6-flash-high
+    fallback: anthropic/claude-opus-4-6
+    # Same ordering rationale as level 1: human-given order, no ranking claim.
+    secondary:
+      - openai/gpt-5.5-high
+      - openai/gpt-5.6-terra-high
+      - openai/gpt-5.6-luna-high
+    max_cost_per_call_usd: 3.00
+    # 2026-08-09 (human decision, v2 auto-dispatch): flipped to false — the
+    # router's decision is displayed, never confirmed, at every level. Narrow
+    # exceptions live in q-dispatch/q-orchestrate: codex candidates (finite
+    # credits) and migration/security type_overrides in routing.yaml.
+    requires_human_gate: false
+
+policies:
+  max_attempts_default: 2
+  cost_bounded_by_dispatcher: true
+  system_commits: true
+  human_merges: true
+  # Deterministic transport preference order consumed by `quorum fleet route`
+  # when building the ordered candidate transport slice. Expresses the
+  # cross-provider reroute preference as DATA (not Go): agy_edit first so the
+  # gemini-3.6-flash models it exposes resolve to the agentic-editing variant
+  # (agy stays next and keeps owning every other gemini model for one-shot
+  # review/analysis), opencode before aider (cross-provider before the
+  # mechanical-single-file fallback), then codex (reactivated 2026-07-22 on
+  # finite free-tier credits) and claude (inactive) last.
+  # A transport absent from this list is unreachable via `fleet route`.
+  fleet_transport_order:
+    - agy_edit
+    - agy
+    - opencode
+    - aider
+    - codex
+    - claude

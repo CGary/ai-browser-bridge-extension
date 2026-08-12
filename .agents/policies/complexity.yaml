@@ -1,0 +1,29 @@
+# Complexity band cut points — read at runtime by `quorum analyze complexity-score`
+# via the JSON request piped through stdin (see internal/core/complexity_score.go).
+# These are NOT hardcoded in Go; the binary always receives them as input.
+#
+# Calibration evidence (2026-08-05):
+# Dataset: n=118 historical blueprints from quorum and hexcell tasks.
+# Method: rule and threshold sweep across S/M/L cut points.
+# Chosen rule: production-only file counting (excluding tests, testdata, and docs).
+calibrated: true
+
+# Band S: files and symbols both within these bounds, and no L-trigger signal.
+s_max_files: 2
+s_max_symbols: 3
+
+# Band L: file count strictly above this cut, OR any of migration /
+# public_api / schema_change signals set on the blueprint — forces L
+# regardless of file/symbol counts.
+l_max_files: 5
+
+# Band M: everything that is neither S nor L.
+
+# Noncounted globs — files matching any pattern are excluded from the S/M/L file count.
+noncounted_globs:
+  - "*_test.go"
+  - "**/testdata/**"
+  - "**/test/**"
+  - "**/tests/**"
+  - "*.md"
+  - "**/docs/**"

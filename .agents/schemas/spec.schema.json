@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "spec.schema.json",
+  "title": "Quorum Task Specification",
+  "type": "object",
+  "required": [
+    "task_id",
+    "summary",
+    "goal",
+    "invariants",
+    "acceptance"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "task_id": {
+      "type": "string",
+      "pattern": "^[A-Z]+-[0-9]+(-[a-z])?$",
+      "description": "Canonical task ID. Children appended -a, -b, ... (e.g. FEAT-001-a)."
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 200,
+      "minLength": 1
+    },
+    "goal": {
+      "type": "string",
+      "minLength": 10
+    },
+    "invariants": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "acceptance": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "required": [
+              "id",
+              "statement"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^AC-[0-9]+$",
+                "description": "Stable criterion identity within this spec. Never renumbered; uniqueness is a q-analyze protocol finding, not enforced here."
+              },
+              "statement": {
+                "type": "string",
+                "minLength": 1
+              },
+              "given": {
+                "type": "string"
+              },
+              "when": {
+                "type": "string"
+              },
+              "then": {
+                "type": "string"
+              }
+            }
+          }
+        ]
+      },
+      "minItems": 1
+    },
+    "risk": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ]
+    },
+    "non_goals": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "parent_task": {
+      "type": "string",
+      "pattern": "^[A-Z]+-[0-9]+$",
+      "description": "Set on child tasks. References the umbrella parent task_id."
+    },
+    "decomposition": {
+      "type": "array",
+      "description": "Set on parent tasks. Lists children created by /q-decompose.",
+      "items": {
+        "type": "object",
+        "required": ["child_id", "summary"],
+        "additionalProperties": false,
+        "properties": {
+          "child_id": {
+            "type": "string",
+            "pattern": "^[A-Z]+-[0-9]+-[a-z]$"
+          },
+          "summary": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1
+          },
+          "depends_on": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Z]+-[0-9]+-[a-z]$"
+            }
+          }
+        }
+      }
+    },
+    "depends_on": {
+      "type": "array",
+      "description": "Set on child tasks that must be implemented after listed siblings.",
+      "items": {
+        "type": "string",
+        "pattern": "^[A-Z]+-[0-9]+-[a-z]$"
+      }
+    }
+  }
+}

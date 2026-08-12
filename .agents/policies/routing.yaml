@@ -1,0 +1,76 @@
+# Routing rules for phase=implement, expressed as an explicit {risk x band}
+# matrix (max-severity: level = max(risk_level, band_level); low/S=0,
+# medium/M=1, high/L=2). Every (risk, band) pair matches exactly one cell, so
+# rule order is irrelevant within the matrix. A trailing catch-all rule (empty
+# match) is the safe default for any non-implement phase or unanticipated value,
+# so core.Route never hits its structural "no matching rule" error.
+# Cost, retries, and escalation are dispatcher-controlled, not agent-controlled.
+rules:
+  # low/S -> level 0 (the ratified G1 cheap cell).
+  - match: {phase: implement, risk: low, band: S}
+    executor_level: 0
+    reviewer_required: true
+    max_attempts: 2
+
+  # medium-or-M cells -> level 1.
+  - match: {phase: implement, risk: low, band: M}
+    executor_level: 1
+    reviewer_required: true
+    max_attempts: 2
+  - match: {phase: implement, risk: medium, band: S}
+    executor_level: 1
+    reviewer_required: true
+    max_attempts: 2
+  - match: {phase: implement, risk: medium, band: M}
+    executor_level: 1
+    reviewer_required: true
+    max_attempts: 2
+
+  # high-or-L cells -> level 2. 2026-08-09 (human decision, v2 auto-dispatch):
+  # human_gate_required flipped to false across the matrix — dispatch decisions
+  # are displayed, not confirmed. The catch-all and type_overrides below keep
+  # their gates as safe defaults for unanticipated values and for
+  # migration/security work.
+  - match: {phase: implement, risk: low, band: L}
+    executor_level: 2
+    reviewer_required: true
+    max_attempts: 1
+    human_gate_required: false
+  - match: {phase: implement, risk: medium, band: L}
+    executor_level: 2
+    reviewer_required: true
+    max_attempts: 1
+    human_gate_required: false
+  - match: {phase: implement, risk: high, band: S}
+    executor_level: 2
+    reviewer_required: true
+    max_attempts: 1
+    human_gate_required: false
+  - match: {phase: implement, risk: high, band: M}
+    executor_level: 2
+    reviewer_required: true
+    max_attempts: 1
+    human_gate_required: false
+  - match: {phase: implement, risk: high, band: L}
+    executor_level: 2
+    reviewer_required: true
+    max_attempts: 1
+    human_gate_required: false
+
+  # Catch-all safe default (any non-implement phase or unanticipated value).
+  - match: {}
+    executor_level: 2
+    reviewer_required: true
+    max_attempts: 1
+    human_gate_required: true
+
+type_overrides:
+  migration:
+    reviewer_required: true
+    human_gate_required: true
+  security:
+    reviewer_required: true
+    human_gate_required: true
+
+routes:
+  default: [context, executor_L0, verify, reviewer_L1, before_merge]

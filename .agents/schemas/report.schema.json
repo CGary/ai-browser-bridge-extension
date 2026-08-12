@@ -1,0 +1,427 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "report.schema.json",
+  "title": "Report Artifact Schema",
+  "description": "Validation schema for Quorum report artifacts. Supports semantic v1.1 model only.",
+  "type": "object",
+  "$ref": "#/$defs/semanticModel",
+  
+  "$defs": {
+    "semanticModel": {
+      "type": "object",
+      "properties": {
+        "meta": { "$ref": "#/$defs/metaSemantic" },
+        "kind": { "$ref": "#/$defs/kindEnum" },
+        "presentation": { "$ref": "#/$defs/presentationModel" },
+        "content": { "$ref": "#/$defs/contentModel" }
+      },
+      "required": ["meta", "kind", "presentation", "content"],
+      "additionalProperties": false
+    },
+    
+    "metaSemantic": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "schemaVersion": { "const": "1.1" },
+        "date": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "schemaVersion", "date"],
+      "additionalProperties": false
+    },
+    
+    "kindEnum": {
+      "type": "string",
+      "enum": [
+        "generic",
+        "project_usage",
+        "refactor_plan",
+        "refactor_result",
+        "audit",
+        "decision_brief",
+        "technical_analysis"
+      ]
+    },
+    
+    "presentationModel": {
+      "type": "object",
+      "properties": {
+        "profile": { "type": "string", "enum": ["cognitive", "executive", "audit", "teaching", "raw"] },
+        "density": { "type": "string", "enum": ["low", "medium", "high"] },
+        "audience": { "type": "string", "enum": ["engineer", "maintainer", "reviewer", "manager", "user"] },
+        "language": { "type": "string", "enum": ["es", "en"] }
+      },
+      "required": ["profile", "density", "audience", "language"],
+      "additionalProperties": false
+    },
+    
+    "contentModel": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "kicker": { "type": "string" },
+        "summary": { "type": "string" },
+        "verdict": {
+          "type": "object",
+          "properties": {
+            "text": { "type": "string" },
+            "confidence": { "type": "string", "enum": ["high", "medium", "low"] }
+          },
+          "required": ["text"],
+          "additionalProperties": false
+        },
+        "sections": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/semanticSection" }
+        }
+      },
+      "required": ["title", "verdict", "sections"],
+      "additionalProperties": false
+    },
+    
+    "semanticSection": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/$defs/sectionID" },
+        "role": {
+          "type": "string",
+          "enum": [
+            "decision_surface",
+            "verification",
+            "findings",
+            "analysis",
+            "diagram",
+            "tradeoffs",
+            "risks",
+            "action_plan",
+            "evidence",
+            "appendix",
+            "metrics",
+            "callout"
+          ]
+        },
+        "title": { "type": "string" }
+      },
+      "required": ["id", "role", "title"],
+      "allOf": [
+        {
+          "if": { "properties": { "role": { "const": "decision_surface" } } },
+          "then": { "$ref": "#/$defs/decisionSurfaceSection" }
+        },
+        {
+          "if": { "properties": { "role": { "const": "verification" } } },
+          "then": { "$ref": "#/$defs/verificationSection" }
+        },
+        {
+          "if": { "properties": { "role": { "const": "findings" } } },
+          "then": { "$ref": "#/$defs/findingsSection" }
+        },
+        {
+          "if": { "properties": { "role": { "const": "analysis" } } },
+          "then": { "$ref": "#/$defs/analysisSection" }
+        },
+        {
+          "if": { "properties": { "role": { "const": "diagram" } } },
+          "then": { "$ref": "#/$defs/diagramSection" }
+        },
+        {
+          "if": { "properties": { "role": { "const": "tradeoffs" } } },
+          "then": { "$ref": "#/$defs/tradeoffsSection" }
+        },
+        {
+          "if": { "properties": { "role": { "const": "risks" } } },
+          "then": { "$ref": "#/$defs/risksSection" }
+        },
+        {
+          "if": { "properties": { "role": { "const": "action_plan" } } },
+          "then": { "$ref": "#/$defs/actionPlanSection" }
+        },
+        {
+          "if": { "properties": { "role": { "const": "evidence" } } },
+          "then": { "$ref": "#/$defs/evidenceSection" }
+        },
+        {
+          "if": { "properties": { "role": { "const": "appendix" } } },
+          "then": { "$ref": "#/$defs/appendixSection" }
+        },
+        {
+          "if": { "properties": { "role": { "const": "metrics" } } },
+          "then": { "$ref": "#/$defs/metricsSection" }
+        },
+        {
+          "if": { "properties": { "role": { "const": "callout" } } },
+          "then": { "$ref": "#/$defs/calloutSection" }
+        }
+      ]
+    },
+    
+    "sectionID": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    
+    "severityOrImpact": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "critical"]
+    },
+    
+    "decisionSurfaceSection": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/$defs/sectionID" },
+        "role": { "const": "decision_surface" },
+        "title": { "type": "string" },
+        "body": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "required": ["id", "role", "title", "body"],
+      "additionalProperties": false
+    },
+    
+    "verificationSection": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/$defs/sectionID" },
+        "role": { "const": "verification" },
+        "title": { "type": "string" },
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "items": {
+            "type": "object",
+            "properties": {
+              "what": { "type": "string" },
+              "why": { "type": "string" },
+              "check": { "type": "string" }
+            },
+            "required": ["what", "why", "check"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["id", "role", "title", "items"],
+      "additionalProperties": false
+    },
+    
+    "findingsSection": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/$defs/sectionID" },
+        "role": { "const": "findings" },
+        "title": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+              "finding": { "type": "string" },
+              "why": { "type": "string" },
+              "action": { "type": "string" },
+              "severity": { "$ref": "#/$defs/severityOrImpact" }
+            },
+            "required": ["id", "finding"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["id", "role", "title", "items"],
+      "additionalProperties": false
+    },
+    
+    "analysisSection": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/$defs/sectionID" },
+        "role": { "const": "analysis" },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "details": {
+          "type": "object",
+          "properties": {
+            "label": { "type": "string" },
+            "body": { "type": "string" }
+          },
+          "required": ["body"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["id", "role", "title", "body"],
+      "additionalProperties": false
+    },
+    
+    "diagramSection": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/$defs/sectionID" },
+        "role": { "const": "diagram" },
+        "title": { "type": "string" },
+        "diagram": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string", "enum": ["mermaid"] },
+            "code": { "type": "string" }
+          },
+          "required": ["type", "code"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["id", "role", "title", "diagram"],
+      "additionalProperties": false
+    },
+    
+    "tradeoffsSection": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/$defs/sectionID" },
+        "role": { "const": "tradeoffs" },
+        "title": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "option": { "type": "string" },
+              "upside": { "type": "string" },
+              "downside": { "type": "string" },
+              "useWhen": { "type": "string" },
+              "avoidWhen": { "type": "string" }
+            },
+            "required": ["option"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["id", "role", "title", "items"],
+      "additionalProperties": false
+    },
+    
+    "risksSection": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/$defs/sectionID" },
+        "role": { "const": "risks" },
+        "title": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "risk": { "type": "string" },
+              "signal": { "type": "string" },
+              "impact": { "$ref": "#/$defs/severityOrImpact" },
+              "mitigation": { "type": "string" }
+            },
+            "required": ["risk", "impact"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["id", "role", "title", "items"],
+      "additionalProperties": false
+    },
+    
+    "actionPlanSection": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/$defs/sectionID" },
+        "role": { "const": "action_plan" },
+        "title": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "step": { "type": "integer" },
+              "action": { "type": "string" },
+              "owner": { "type": "string" }
+            },
+            "required": ["step", "action", "owner"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["id", "role", "title", "items"],
+      "additionalProperties": false
+    },
+    
+    "evidenceSection": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/$defs/sectionID" },
+        "role": { "const": "evidence" },
+        "title": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "findingId": { "type": "string" },
+              "path": { "type": "string" },
+              "details": { "type": "string" }
+            },
+            "required": ["details"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["id", "role", "title", "items"],
+      "additionalProperties": false
+    },
+    
+    "appendixSection": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/$defs/sectionID" },
+        "role": { "const": "appendix" },
+        "title": { "type": "string" },
+        "body": { "type": "string" }
+      },
+      "required": ["id", "role", "title", "body"],
+      "additionalProperties": false
+    },
+    
+    "metricsSection": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/$defs/sectionID" },
+        "role": { "const": "metrics" },
+        "title": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": { "type": "string" },
+              "value": { "type": "number" },
+              "unit": { "type": "string" },
+              "display": { "type": "string" }
+            },
+            "required": ["label", "value"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["id", "role", "title", "items"],
+      "additionalProperties": false
+    },
+    
+    "calloutSection": {
+      "type": "object",
+      "properties": {
+        "id": { "$ref": "#/$defs/sectionID" },
+        "role": { "const": "callout" },
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "kind": { "type": "string", "enum": ["decision", "warning", "note"] },
+        "label": { "type": "string" }
+      },
+      "required": ["id", "role", "title", "body", "kind"],
+      "additionalProperties": false
+    }
+  }
+}

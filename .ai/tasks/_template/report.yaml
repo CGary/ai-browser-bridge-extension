@@ -1,0 +1,33 @@
+# Quorum semantic report template — this is a PALETTE MENU, not a form.
+# Only `meta`, `kind`, `presentation`, and `content` are required.
+# Seed format: semantic model v1.1.
+#
+# Properties and roles catalog (uncomment/copy what you need):
+# Top-level: `kind`, `presentation`, `content`
+# Legacy properties: `verdict`, `summary`, `decisionSurface`, `callouts`, `verify`, `keyFindings`, `diagrams`, `findings`, `evidence`, `tradeoffs`, `risks`, `actionPlan`, `appendix`
+# Semantic roles: `decision_surface`, `verification`, `findings`, `analysis`, `diagram`, `tradeoffs`, `risks`, `action_plan`, `evidence`, `appendix`, `metrics`, `callout`
+
+meta:
+  id: "template-id"
+  schemaVersion: "1.1"
+  date: "2026-06-01T00:00:00Z"
+
+kind: generic
+
+presentation:
+  profile: cognitive
+  density: medium
+  audience: engineer
+  language: es
+
+content:
+  title: "Generic Report Title"
+  kicker: "Context / Subtitle"
+  verdict:
+    text: "One-sentence bottom line, front-loaded so it is read first."
+    confidence: high
+  sections:
+    - id: executive-summary
+      role: analysis
+      title: "Resumen Ejecutivo"
+      body: "Describe the primary outcomes and technical analysis here."
