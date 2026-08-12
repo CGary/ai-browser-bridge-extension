@@ -1,12 +1,14 @@
 # AI Browser Bridge Extension (aibbe)
 
-## Propósito
+> Language / Idioma: **English** | [Español](es-README.md)
 
-Puente de automatización entre una CLI/daemon en Go y **NotebookLM** (Google) corriendo en un navegador Chromium. Permite a un agente externo enviar prompts, leer respuestas y ajustar selectores DOM en caliente, sin recargar la extensión.
+## Purpose
 
-La extensión está acoplada a NotebookLM (el content script sólo matchea `https://notebooklm.google.com/*` y `https://notebook.google.com/*` — Google migró NotebookLM a este último dominio). El resto del stack (CLI, daemon, protocolo) es agnóstico de servicio.
+Automation bridge between a Go CLI/daemon and **NotebookLM** (Google) running in a Chromium browser. It allows an external agent to send prompts, read responses, and adjust DOM selectors on the fly, without reloading the extension.
 
-## Arquitectura
+The extension is coupled to NotebookLM (the content script only matches `https://notebooklm.google.com/*` and `https://notebook.google.com/*` — Google migrated NotebookLM to the latter domain). The rest of the stack (CLI, daemon, protocol) is service-agnostic.
+
+## Architecture
 
 ```
 ┌─────────┐    Unix Socket    ┌────────────┐    Native Messaging    ┌──────────────────────┐
@@ -14,169 +16,169 @@ La extensión está acoplada a NotebookLM (el content script sólo matchea `http
 │ cmd/cli │   ipc.Request    │  daemon/   │   4-byte LE + JSON    │  background.js (SW)  │
 │         │ ◄────────────── │            │ ◄──────────────────── │  content.js          │
 └─────────┘   ipc.Response   └────────────┘                       │  → notebooklm.google │
-                                                                   └──────────────────────┘
+                                                                    └──────────────────────┘
 ```
 
-| Capa | Formato | Límite |
+| Layer | Format | Limit |
 |---|---|---|
-| CLI ↔ Daemon | JSON sobre Unix socket (`ipc.Request{Cmd, Target, Payload}`) | 1 MB |
-| Daemon ↔ Extension | Native Messaging: prefijo uint32 LE + JSON | 1 MB |
-| Extension → Tab | `chrome.tabs.sendMessage` al content script de la pestaña elegida | — |
+| CLI ↔ Daemon | JSON over Unix socket (`ipc.Request{Cmd, Target, Payload}`) | 1 MB |
+| Daemon ↔ Extension | Native Messaging: uint32 LE length prefix + JSON | 1 MB |
+| Extension → Tab | `chrome.tabs.sendMessage` to the content script of the target tab | — |
 
-Una solicitud a la vez, sincrónico. `fail-fast`: cualquier error aborta con exit code 1 (sin reintentos).
+One request at a time, synchronous. `fail-fast`: any error aborts with exit code 1 (no retries).
 
-## Componentes
+## Components
 
-| Ruta | Descripción |
+| Path | Description |
 |---|---|
-| `cmd/cli/main.go` | CLI efímera. Acepta `-cmd`, `-target`, `-payload` |
-| `daemon/main.go` | Daemon residente. Unix socket → Native Messaging |
-| `extension/manifest.json` | Manifest V3, ID estático, permisos `nativeMessaging`/`storage`/`tabs` |
-| `extension/background.js` | Service Worker. Conecta al native host, rutea comandos a pestañas |
-| `extension/content.js` | Inyectado en NotebookLM. Selectores DOM + calibración runtime |
-| `internal/ipc/` | `Request`/`Response`, resolución de socket path |
+| `cmd/cli/main.go` | Ephemeral CLI. Accepts `-cmd`, `-target`, `-payload` |
+| `daemon/main.go` | Resident daemon. Unix socket → Native Messaging |
+| `extension/manifest.json` | Manifest V3, static ID, permissions `nativeMessaging`/`storage`/`tabs` |
+| `extension/background.js` | Service Worker. Connects to native host, routes commands to tabs |
+| `extension/content.js` | Injected into NotebookLM. DOM selectors + runtime calibration |
+| `internal/ipc/` | `Request`/`Response`, socket path resolution |
 | `internal/nativemessaging/` | Codec 4-byte LE + JSON |
-| `configs/aibbe.nm-host.json` | Manifest de Native Messaging (Linux host) |
-| `configs/aibbe.nm-host.docker.json` | Manifest de Native Messaging para el contenedor |
-| `configs/docker/docker-compose.yml` | Stack Chromium + daemon en Docker |
+| `configs/aibbe.nm-host.json` | Native Messaging Manifest (Linux host) |
+| `configs/aibbe.nm-host.docker.json` | Native Messaging Manifest for container |
+| `configs/docker/docker-compose.yml` | Chromium + daemon stack in Docker |
 
-## Routing a pestañas (HANDSHAKE)
+## Tab Routing (HANDSHAKE)
 
-Cada pestaña de NotebookLM, al cargar el content script, envía un `HANDSHAKE` al background con el nombre del notebook como `target`. El background mantiene un `tabRegistry` de pestañas libres.
+Each NotebookLM tab sends a `HANDSHAKE` to the background on content script load with the notebook title as `target`. The background maintains a `tabRegistry` of available tabs.
 
-- Sin flag `-target`: el daemon encuentra la primera pestaña libre.
-- Con `-target "nombre del notebook"`: rutea a la pestaña cuyo título coincide exactamente.
+- Without `-target` flag: the daemon routes to the first available free tab.
+- With `-target "notebook title"`: routes to the tab whose title matches exactly.
 
-Para que el CLI pueda rutear aún antes de que aparezca el título, el content script envía un handshake inicial con `target=null` y luego lo actualiza cuando el título renderiza. El nombre se toma de `div.cover-title` si existe; si esa clase cambia (UI de "Gemini Notebook"), cae al `<title>` de la página quitando el sufijo de marca (`"Siat - Gemini Notebook"` → `"Siat"`).
+To allow the CLI to route even before the title is rendered, the content script sends an initial handshake with `target=null` and updates it once the title renders. The title is extracted from `div.cover-title` if present; if that class changes ("Gemini Notebook" UI), it falls back to page `<title>` by stripping the brand suffix (`"Siat - Gemini Notebook"` → `"Siat"`).
 
-## Comandos disponibles
+## Available Commands
 
-| Cmd | Payload | Respuesta | Qué hace |
+| Cmd | Payload | Response | What it does |
 |---|---|---|---|
-| `generate` | texto del prompt | `{status, result}` | Inyecta el prompt, submit, espera respuesta completa |
-| `probe-selectors` | — | `{status, report}` | Reporta cuántos elementos matchea cada selector (diagnóstico) |
-| `get-active-selectors` | — | `{status, selectors}` | Devuelve selectores vivos indicando si vienen de default o calibración |
-| `calibrate` | JSON `{KEY: "selector", ...}` | `{status, applied}` | Sobrescribe selectores en `chrome.storage.local` y broadcast a todas las pestañas |
-| `reset-selectors` | — | `{status}` | Borra todas las calibraciones, vuelve a defaults del código |
+| `generate` | prompt text | `{status, result}` | Injects prompt, submits, waits for complete response |
+| `probe-selectors` | — | `{status, report}` | Reports how many elements match each selector (diagnostics) |
+| `get-active-selectors` | — | `{status, selectors}` | Returns active selectors indicating if default or calibrated |
+| `calibrate` | JSON `{KEY: "selector", ...}` | `{status, applied}` | Overrides selectors in `chrome.storage.local` and broadcasts to all tabs |
+| `reset-selectors` | — | `{status}` | Clears all calibrations, reverts to code defaults |
 
-Claves válidas para `calibrate`: `INPUT`, `SUBMIT_BUTTON`, `RESPONSE_CONTAINER`, `RESPONSE_TEXT`, `THINKING_MARKERS`, `RESPONSE_READY_MARKERS`, `CITATION_NOISE`.
+Valid keys for `calibrate`: `INPUT`, `SUBMIT_BUTTON`, `RESPONSE_CONTAINER`, `RESPONSE_TEXT`, `THINKING_MARKERS`, `RESPONSE_READY_MARKERS`, `CITATION_NOISE`.
 
-## Quickstart — Docker (recomendado)
+## Quickstart — Docker (Recommended)
 
-Setup completo con Chromium aislado en contenedor: ver [`docs/quickstart-docker.md`](docs/quickstart-docker.md). Resumen:
+Full setup with isolated Chromium in container: see [`docs/quickstart-docker.md`](docs/quickstart-docker.md). Summary:
 
 ```bash
-# 1. Compilar binarios para linux/amd64 (el compose los monta desde bin/)
+# 1. Build binaries for linux/amd64 (compose mounts them from bin/)
 GOOS=linux GOARCH=amd64 go build -o bin/aibbe-daemon ./daemon/
 GOOS=linux GOARCH=amd64 go build -o bin/aibbe-cli ./cmd/cli/
 
-# 2. Credenciales VPN (ProtonVPN OpenVPN; vpn.env queda git-ignorado)
-cp configs/docker/vpn.env.example configs/docker/vpn.env  # y completarlo
+# 2. VPN credentials (ProtonVPN OpenVPN; vpn.env is git-ignored)
+cp configs/docker/vpn.env.example configs/docker/vpn.env  # and fill it out
 
-# 3. Levantar el stack (servicios: vpn + chrome)
+# 3. Start the stack (services: vpn + chrome)
 docker compose -f configs/docker/docker-compose.yml up -d
 
-# 4. Cargar la extensión en Chrome (http://localhost:9500) desde /config/extensions/aibbe
+# 4. Load extension in Chrome (http://localhost:9500) from /config/extensions/aibbe
 
-# 5. Usar el CLI dentro del contenedor (el socket vive dentro del container)
-docker exec chrome aibbe-cli -cmd generate -payload "hola"
+# 5. Use CLI inside the container (socket lives inside container)
+docker exec chrome aibbe-cli -cmd generate -payload "hello"
 ```
 
-## Quickstart — Host local (sin Docker)
+## Quickstart — Local Host (Without Docker)
 
 ```bash
-# Compilar
+# Build
 go build -o /tmp/aibbe-daemon ./daemon/
 go build -o /tmp/aibbe-cli ./cmd/cli/
 
-# Registrar native host (Chromium)
+# Register native host (Chromium)
 mkdir -p ~/.config/chromium/NativeMessagingHosts/
 cp configs/aibbe.nm-host.json ~/.config/chromium/NativeMessagingHosts/aibbe.json
-# editar el "path" del manifest para apuntar al binario
+# edit the "path" in manifest to point to binary
 
-# Cargar la extensión
-#   chrome://extensions → Modo desarrollador → Cargar descomprimida → extension/
+# Load extension
+#   chrome://extensions → Developer mode → Load unpacked → extension/
 
-# Levantar daemon
+# Start daemon
 /tmp/aibbe-daemon
 
-# Usar
-/tmp/aibbe-cli -cmd generate -payload "qué es eslint"
+# Use CLI
+/tmp/aibbe-cli -cmd generate -payload "what is eslint"
 ```
 
-## Flujo de calibración cuando NotebookLM cambia el DOM
+## Calibration Workflow when NotebookLM changes DOM
 
 ```bash
-# 1. Diagnosticar
+# 1. Diagnose
 aibbe-cli -cmd probe-selectors
-#   → identifica qué selectores quedaron en "missing" o "multiple"
+#   → identifies which selectors are marked as "missing" or "multiple"
 
-# 2. Inspeccionar DOM en DevTools, buscar una clase semántica estable
-#    (ignorar ng-*, mat-mdc-*, cdk-*, _nghost-*, ng-tns-*)
+# 2. Inspect DOM in DevTools, find a stable semantic class
+#    (ignore ng-*, mat-mdc-*, cdk-*, _nghost-*, ng-tns-*)
 
-# 3. Override runtime (sin recargar nada)
-aibbe-cli -cmd calibrate -payload '{"SUBMIT_BUTTON": "button.nueva-clase"}'
+# 3. Runtime override (without reloading anything)
+aibbe-cli -cmd calibrate -payload '{"SUBMIT_BUTTON": "button.new-class"}'
 
-# 4. Validar
+# 4. Validate
 aibbe-cli -cmd probe-selectors
 aibbe-cli -cmd generate -payload "test"
 
-# 5. Si andás bien, pasá el selector a los defaults en extension/content.js y:
+# 5. If working well, update default selectors in extension/content.js and reset:
 aibbe-cli -cmd reset-selectors
 ```
 
-## Variables de entorno
+## Environment Variables
 
-| Variable | Default | Descripción |
+| Variable | Default | Description |
 |---|---|---|
-| `AIBBE_SOCKET_PATH` | `/tmp/aibbe.sock` | Ruta del socket Unix (CLI y daemon deben coincidir) |
+| `AIBBE_SOCKET_PATH` | `/tmp/aibbe.sock` | Unix socket path (CLI and daemon must match) |
 
-## Extensión Chromium
+## Chromium Extension
 
 - **Version**: 0.1.0
-- **ID estático**: `bedlojjaiogmaefoadfpdecgajipcpgj` (fijado vía `key` en el manifest)
-- **Permisos**: `nativeMessaging`, `storage`, `tabs`
+- **Static ID**: `bedlojjaiogmaefoadfpdecgajipcpgj` (pinned via `key` in manifest)
+- **Permissions**: `nativeMessaging`, `storage`, `tabs`
 - **Host matches**: `https://notebooklm.google.com/*`, `https://notebook.google.com/*`
 - **Native host name**: `aibbe`
 
-## Decisiones de diseño
+## Design Decisions
 
-- **Fail-fast**: sin reintentos ni fallbacks. Cualquier error protocolar aborta con exit 1.
-- **Storage volátil para automatización**: sin persistencia a disco. Solo las calibraciones viven en `chrome.storage.local` (persistente por diseño).
-- **Socket 0600**: creado con `umask 0o177`, sólo el dueño puede leer/escribir.
-- **Validación de tamaño en dos capas**: IPC (1 MB primario) + Native Messaging (1 MB defensivo).
-- **Selectores locale-agnósticos por default**: priorizar clases CSS semánticas de NotebookLM (`query-box-input`, `submit-button`, `to-user-message-inner-content`, `message-actions`) sobre `aria-label`, para que ande en `es`, `nl`, `en`, etc.
+- **Fail-fast**: no retries or fallbacks. Any protocol error aborts with exit code 1.
+- **Volatile storage for automation data**: no persistence to disk. Only calibrations live in `chrome.storage.local` (persistent by design).
+- **Socket permissions 0600**: created with `umask 0o177`, owner access only.
+- **Two-layer size validation**: IPC layer (1 MB primary) + Native Messaging layer (1 MB defensive).
+- **Locale-agnostic default selectors**: prefer NotebookLM semantic CSS classes (`query-box-input`, `submit-button`, `to-user-message-inner-content`, `message-actions`) over `aria-label`, so it works across `es`, `nl`, `en`, etc.
 
 ## Troubleshooting
 
-| Síntoma | Causa probable | Fix |
+| Symptom | Probable Cause | Fix |
 |---|---|---|
-| `generate` devuelve `response_timeout` | Un selector (probable `RESPONSE_READY_MARKERS` o `RESPONSE_CONTAINER`) no matchea | `probe-selectors` + `calibrate` |
-| `generate` devuelve solo parte del texto | `RESPONSE_TEXT` apunta a un nodo demasiado estrecho | Inspeccionar y recalibrar |
-| `no_free_tabs` | Ninguna pestaña de NotebookLM registrada en el handshake | Abrir/refrescar la pestaña; revisar consola del content script |
-| `target_not_found` | El `-target` no coincide con el título de ningún notebook | Omitir `-target` o usar el nombre exacto |
-| `native messaging host has not registered` | Manifest mal ubicado o path de binario incorrecto | Verificar `~/.config/chromium/NativeMessagingHosts/aibbe.json` |
-| Socket connection refused | Daemon no corriendo | Levantar daemon |
-| Permission denied en el socket | Dueño incorrecto (típico en Docker por UID/GID mismatch) | Ver `docs/quickstart-docker.md` |
+| `generate` returns `response_timeout` | A selector (likely `RESPONSE_READY_MARKERS` or `RESPONSE_CONTAINER`) does not match | `probe-selectors` + `calibrate` |
+| `generate` returns partial text | `RESPONSE_TEXT` points to a node that is too narrow | Inspect and recalibrate |
+| `no_free_tabs` | No NotebookLM tab registered via handshake | Open/refresh tab; check content script console |
+| `target_not_found` | `-target` does not match title of any notebook | Omit `-target` or use exact name |
+| `native messaging host has not registered` | Manifest misplaced or binary path incorrect | Verify `~/.config/chromium/NativeMessagingHosts/aibbe.json` |
+| Socket connection refused | Daemon not running | Start daemon |
+| Permission denied on socket | Incorrect owner (common in Docker due to UID/GID mismatch) | See `docs/quickstart-docker.md` |
 
-## Desarrollo
+## Development
 
 ```bash
 # Tests
 go test ./...
 go test ./daemon/ -run TestCleanupSocket_FileExists
 
-# Análisis estático
+# Static analysis
 go vet ./...
 
-# Syntax check de la extensión
+# Extension syntax check
 node --check extension/content.js
 node --check extension/background.js
 ```
 
-## Documentación adicional
+## Additional Documentation
 
-- [`docs/quickstart-docker.md`](docs/quickstart-docker.md) — setup Docker paso a paso
-- [`docs/Software Design Document.md`](docs/Software%20Design%20Document.md) — decisiones arquitecturales
-- [`docs/propuesta-calibracion-dinamica.md`](docs/propuesta-calibracion-dinamica.md) — diseño del sistema de calibración
-- [`CLAUDE.md`](CLAUDE.md) — guía para agentes que trabajan en este repo
+- [`docs/quickstart-docker.md`](docs/quickstart-docker.md) — step-by-step Docker setup
+- [`docs/Software Design Document.md`](docs/Software%20Design%20Document.md) — architectural decisions
+- [`docs/propuesta-calibracion-dinamica.md`](docs/propuesta-calibracion-dinamica.md) — calibration system design
+- [`CLAUDE.md`](CLAUDE.md) — guide for agents working in this repository
