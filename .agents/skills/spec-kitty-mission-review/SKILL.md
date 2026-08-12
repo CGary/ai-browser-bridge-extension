@@ -1,0 +1,1 @@
+/home/gary/.claude/skills/spec-kitty-mission-review/SKILL.md

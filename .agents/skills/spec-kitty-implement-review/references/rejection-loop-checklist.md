@@ -1,0 +1,1 @@
+/home/gary/.claude/skills/spec-kitty-implement-review/references/rejection-loop-checklist.md
