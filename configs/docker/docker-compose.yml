@@ -9,6 +9,15 @@
 # START:    docker compose -f configs/docker/docker-compose.yml up -d
 # STOP:     docker compose -f configs/docker/docker-compose.yml down
 # BROWSER:  http://localhost:9500 (User: admin, Pass: admin)
+#
+# OPTIONAL "us" PROFILE (temporary, 2026-09-06): a second, independent browser with a
+# US exit IP and its own clean Chrome profile. Does not touch the default stack.
+#   START:   docker compose -f configs/docker/docker-compose.yml --profile us up -d vpn-us chrome-us
+#   STOP:    docker compose -f configs/docker/docker-compose.yml --profile us down
+#   BROWSER: http://localhost:9501 (User: admin, Pass: admin)
+#   NOTE: Proton VPN Free allows ONE simultaneous connection — do not run the default
+#         stack (vpn/chrome) and the us profile (vpn-us/chrome-us) at the same time.
+#   REMOVE: delete the vpn-us / chrome-us services and the aibbe-chrome-us-profile volume.
 
 services:
   vpn:
@@ -65,5 +74,60 @@ services:
       - ../aibbe.nm-host.docker.json:/config/.config/google-chrome/NativeMessagingHosts/aibbe.json:ro
       - aibbe-chrome-profile:/config:rw
 
+  # ---------------------------------------------------------------------------
+  # Optional "us" profile — temporary US-exit browser (see header). Independent of
+  # the default vpn/chrome pair: own gluetun, own Chrome profile volume, own port.
+  # ---------------------------------------------------------------------------
+  vpn-us:
+    image: qmcgaw/gluetun
+    container_name: vpn-us
+    profiles: ["us"]
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    env_file:
+      - vpn.env
+    environment:
+      - VPN_SERVICE_PROVIDER=protonvpn
+      - VPN_TYPE=openvpn
+      - SERVER_COUNTRIES=United States
+      - TZ=America/New_York
+      - UPDATER_PERIOD=24h
+      - DOT=off
+      - DNS_ADDRESS=1.1.1.1
+      - FREE_ONLY=on
+    ports:
+      - "9501:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "https://1.1.1.1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  chrome-us:
+    container_name: chrome-us
+    image: linuxserver/chrome:latest
+    profiles: ["us"]
+    network_mode: "service:vpn-us"
+    depends_on:
+      vpn-us:
+        condition: service_healthy
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/New_York
+      - CUSTOM_USER=admin
+      - PASSWORD=admin
+    shm_size: "1gb"
+    security_opt:
+      - seccomp:unconfined
+    restart: unless-stopped
+    volumes:
+      - aibbe-chrome-us-profile:/config:rw
+
 volumes:
   aibbe-chrome-profile:
+  aibbe-chrome-us-profile:
