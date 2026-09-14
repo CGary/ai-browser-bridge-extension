@@ -147,6 +147,7 @@ vite.config.ts.timestamp-*
 .claude/
 .claudeignore
 .worktrees/
+worktrees/
 
 # Local secrets for docker-compose (e.g. VPN credentials)
 configs/docker/*.env
