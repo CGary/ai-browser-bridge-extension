@@ -153,7 +153,7 @@ aibbe-cli -cmd reset-selectors
 
 | Symptom | Probable Cause | Fix |
 |---|---|---|
-| `generate` returns `response_timeout` | A selector (likely `RESPONSE_READY_MARKERS` or `RESPONSE_CONTAINER`) does not match | `probe-selectors` + `calibrate` |
+| `generate` returns `response_timeout` | `THINKING_MARKERS` false positives from substring class matching keep the completion predicate permanently false, or a selector does not match | `reset-selectors` then `probe-selectors` + `calibrate` |
 | `generate` returns partial text | `RESPONSE_TEXT` points to a node that is too narrow | Inspect and recalibrate |
 | `no_free_tabs` | No NotebookLM tab registered via handshake | Open/refresh tab; check content script console |
 | `target_not_found` | `-target` does not match title of any notebook | Omit `-target` or use exact name |

@@ -8,7 +8,7 @@ const SELECTORS = {
   RESPONSE_CONTAINER:     'mat-card-content.to-user-message-inner-content',
   RESPONSE_TEXT:          '.message-content',
   RESPONSE_READY_MARKERS: 'mat-card-actions.message-actions',
-  THINKING_MARKERS:       'thinking-animation, .loading-spinner, [class*="thinking"]',
+  THINKING_MARKERS:       'thinking-animation, .loading-spinner',
   CITATION_NOISE:         'button.citation-marker, .xap-inline-dialog',
 };
 
@@ -236,24 +236,33 @@ function extractCleanTextFromNode(root) {
   return normalizeWhitespace(clone.textContent || "");
 }
 
-function inspectLatestResponse() {
-  const responseContainers = document.querySelectorAll(activeSelectors.RESPONSE_CONTAINER);
-  if (responseContainers.length === 0) {
-    return null;
+function evaluateResponseState(doc, selectors, baselineCount) {
+  const responseContainers = doc.querySelectorAll(selectors.RESPONSE_CONTAINER);
+  const containerCount = responseContainers.length;
+
+  if (containerCount <= baselineCount) {
+    return { eligible: false, containerCount };
   }
 
   const latestResponse = responseContainers[responseContainers.length - 1];
-  const contentRoot = latestResponse.querySelector(activeSelectors.RESPONSE_TEXT) || latestResponse;
+  const contentRoot = latestResponse.querySelector(selectors.RESPONSE_TEXT) || latestResponse;
   const result = extractCleanTextFromNode(contentRoot) || "";
 
-  // READY/THINKING markers are siblings of the response container inside the enclosing chat-message.
   const messageScope = latestResponse.closest("chat-message") || latestResponse.parentElement || latestResponse;
+  const scopeTag = messageScope ? String(messageScope.tagName || "").toUpperCase() : "";
 
   return {
+    eligible: true,
     result,
-    hasThinkingMarkers: messageScope.querySelector(activeSelectors.THINKING_MARKERS) !== null,
-    hasReadyMarkers: messageScope.querySelector(activeSelectors.RESPONSE_READY_MARKERS) !== null,
+    hasThinkingMarkers: messageScope.querySelector(selectors.THINKING_MARKERS) !== null,
+    hasReadyMarkers: messageScope.querySelector(selectors.RESPONSE_READY_MARKERS) !== null,
+    scopeTag,
+    containerCount,
   };
+}
+
+function inspectLatestResponse(doc) {
+  return evaluateResponseState(doc || document, activeSelectors, 0);
 }
 
 function setInputValue(inputElement, payload) {
@@ -314,73 +323,122 @@ async function injectAndSubmit(payload) {
     await sleep(randomBetween(...submitRange));
   }
 
+  const baselineCount = document.querySelectorAll(activeSelectors.RESPONSE_CONTAINER).length;
   submitButton.click();
-  return { status: "success" };
+  return { status: "success", baselineCount };
 }
 
-function waitForAIResponse(sendResponse) {
+function waitForAIResponse(sendResponse, baselineCount) {
+  const timeoutMs = window.__AIBBE_TIMEOUT ?? 150000;
+  const pollMs = window.__AIBBE_POLL_MS ?? 500;
+  const stableTicksNeeded = window.__AIBBE_STABLE_TICKS ?? 2;
+  const hardStableTicksNeeded = window.__AIBBE_HARD_STABLE_TICKS ?? 6;
+
+  let settled = false;
+  let stableTicks = 0;
+  let observerFires = 0;
+  let pollTicks = 0;
+  let lastText = "";
+  let intervalHandle = null;
+  let timeoutHandle = null;
+  let observer = null;
+
+  function cleanup() {
+    if (intervalHandle !== null) { clearInterval(intervalHandle); intervalHandle = null; }
+    if (timeoutHandle !== null) { clearTimeout(timeoutHandle); timeoutHandle = null; }
+    if (observer !== null) { observer.disconnect(); observer = null; }
+  }
+
+  function finish(payload) {
+    if (settled) return;
+    settled = true;
+    cleanup();
+    sendResponse(payload);
+  }
+
   const submitButton = document.querySelector(activeSelectors.SUBMIT_BUTTON);
   if (!submitButton) {
-    sendResponse({ status: "error", error: "submit_button_not_found" });
+    finish({ status: "error", error: "submit_button_not_found" });
     return;
   }
 
-  const timeoutMs = window.__AIBBE_TIMEOUT ?? 150000;
-  const settleMs = window.__AIBBE_SETTLE_MS ?? 750;
-  let settleTimer = null;
-  let pendingSnapshot = "";
-  const timeout = setTimeout(() => {
-    if (settleTimer) {
-      clearTimeout(settleTimer);
+  function tick(source) {
+    if (settled) return;
+
+    if (source === "poll") pollTicks++;
+
+    let state;
+    try {
+      state = evaluateResponseState(document, activeSelectors, baselineCount);
+    } catch (err) {
+      finish({ status: "error", error: err.message || "evaluation_failed" });
+      return;
     }
-    observer.disconnect();
-    sendResponse({ status: "error", error: "response_timeout" });
+
+    if (!state.eligible) return;
+
+    if (source === "observer") {
+      observerFires++;
+      if (state.result !== lastText) {
+        lastText = state.result;
+        stableTicks = 0;
+      }
+      return;
+    }
+
+    if (state.result !== lastText) {
+      lastText = state.result;
+      stableTicks = 0;
+      return;
+    }
+
+    stableTicks++;
+
+    const ready = state.hasReadyMarkers && state.result.trim().length > 0;
+
+    if (ready && stableTicks >= stableTicksNeeded && !state.hasThinkingMarkers) {
+      finish({ status: "success", result: state.result });
+      return;
+    }
+
+    if (ready && stableTicks >= hardStableTicksNeeded) {
+      finish({ status: "success", result: state.result });
+    }
+  }
+
+  timeoutHandle = setTimeout(() => {
+    let state;
+    try {
+      state = evaluateResponseState(document, activeSelectors, baselineCount);
+    } catch (err) {
+      finish({ status: "error", error: err.message || "evaluation_failed" });
+      return;
+    }
+    finish({
+      status: "error",
+      error: "response_timeout",
+      detail: {
+        hasThinkingMarkers: state.eligible ? state.hasThinkingMarkers : false,
+        hasReadyMarkers: state.eligible ? state.hasReadyMarkers : false,
+        resultLength: state.result ? state.result.length : 0,
+        scopeTag: state.eligible ? state.scopeTag : "",
+        observerFires,
+        pollTicks,
+        containerCount: state.containerCount,
+        baselineCount,
+      },
+    });
   }, timeoutMs);
 
-  const flushResponse = () => {
-    const state = inspectLatestResponse();
-    if (!state) {
-      return;
-    }
-
-    if (!state.hasThinkingMarkers && state.hasReadyMarkers && state.result.trim() && state.result === pendingSnapshot) {
-      clearTimeout(timeout);
-      if (settleTimer) {
-        clearTimeout(settleTimer);
-      }
-      observer.disconnect();
-      sendResponse({ status: "success", result: state.result });
-    }
-  };
-
-  const observer = new MutationObserver(() => {
-    const state = inspectLatestResponse();
-    if (!state) {
-      return;
-    }
-
-    if (state.hasThinkingMarkers || !state.hasReadyMarkers || !state.result.trim()) {
-      if (settleTimer) {
-        clearTimeout(settleTimer);
-        settleTimer = null;
-      }
-      return;
-    }
-
-    pendingSnapshot = state.result;
-    if (settleTimer) {
-      clearTimeout(settleTimer);
-    }
-
-    settleTimer = setTimeout(flushResponse, settleMs);
-  });
-
+  observer = new MutationObserver(() => tick("observer"));
   observer.observe(document.body, {
     childList: true,
     subtree: true,
     attributes: true,
     attributeFilter: ["disabled"],
   });
+
+  intervalHandle = setInterval(() => tick("poll"), pollMs);
 }
 
 function probeSelectors() {
@@ -443,7 +501,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse(result);
         return;
       }
-      waitForAIResponse(sendResponse);
+      waitForAIResponse(sendResponse, result.baselineCount ?? 0);
     }).catch((error) => {
       sendResponse({ status: "error", error: error.message || "injection_failed" });
     });

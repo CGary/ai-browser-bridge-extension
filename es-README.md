@@ -153,7 +153,7 @@ aibbe-cli -cmd reset-selectors
 
 | Síntoma | Causa probable | Fix |
 |---|---|---|
-| `generate` devuelve `response_timeout` | Un selector (probable `RESPONSE_READY_MARKERS` o `RESPONSE_CONTAINER`) no matchea | `probe-selectors` + `calibrate` |
+| `generate` devuelve `response_timeout` | Falsos positivos de `THINKING_MARKERS` por match por substring mantienen el predicado de completitud permanentemente falso, o un selector no matchea | `reset-selectors` y luego `probe-selectors` + `calibrate` |
 | `generate` devuelve solo parte del texto | `RESPONSE_TEXT` apunta a un nodo demasiado estrecho | Inspeccionar y recalibrar |
 | `no_free_tabs` | Ninguna pestaña de NotebookLM registrada en el handshake | Abrir/refrescar la pestaña; revisar consola del content script |
 | `target_not_found` | El `-target` no coincide con el título de ningún notebook | Omitir `-target` o usar el nombre exacto |
