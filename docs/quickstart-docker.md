@@ -154,6 +154,8 @@ No image rebuild needed — the binaries are bind-mounted.
 | `chrome` container never starts | VPN healthcheck failing (bad credentials, no tunnel) | `docker logs vpn`; verify ProtonVPN OpenVPN credentials |
 | CLI: "connection refused" / "no such file" | Daemon not running inside container, or CLI run on the host | Run via `docker exec chrome aibbe-cli ...`; check container status |
 | `no_free_tabs` | No NotebookLM tab registered via handshake | Open/refresh a notebook tab in the container's Chrome |
+| `submit_button_not_found` / `input_not_found` | NotebookLM changed its DOM; refreshing the tab does **not** fix it | `aibbe-cli -cmd probe-selectors` (look for `matches: 0`), then hot-fix with `-cmd calibrate -payload '{"KEY":"css"}'`; fix the default in `extension/content.js` and `docker restart chrome` to load it |
+| `target_not_found` | `-target` must equal the notebook name exactly (case-sensitive), e.g. `Siat`, not `SIAT` | Use the name shown in the tab title, without the ` - Gemini Notebook` suffix |
 | Chrome crashes on launch inside container | Shared memory too small | `shm_size: "1gb"` is set; increase to `"2gb"` if it persists |
 | "Native host not found" in extension console | Manifest not mounted at the `google-chrome` path | See Step 8; restart container after compose edits |
 | Extension missing after restart | Profile volume not mounted | Ensure `aibbe-chrome-profile:/config:rw` is present |

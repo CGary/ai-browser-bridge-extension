@@ -1,15 +1,19 @@
 "use strict";
 
-console.log("[aibbe] Content script version: 2026-04-20 (locale-agnostic defaults)");
+console.log("[aibbe] Content script version: 2026-10-13 (submit-button wrapper)");
 
 const SELECTORS = {
   INPUT:                  'textarea.query-box-input',
-  SUBMIT_BUTTON:          'button.submit-button',
+  // NotebookLM moved the submit-button class from <button> to a wrapper element;
+  // the second branch matches the new DOM, the first keeps the old one working.
+  SUBMIT_BUTTON:          'button.submit-button, .submit-button > button',
   RESPONSE_CONTAINER:     'mat-card-content.to-user-message-inner-content',
   RESPONSE_TEXT:          '.message-content',
   RESPONSE_READY_MARKERS: 'mat-card-actions.message-actions',
   THINKING_MARKERS:       'thinking-animation, .loading-spinner',
-  CITATION_NOISE:         'button.citation-marker, .xap-inline-dialog',
+  // .thinking-chain is the collapsible "Thoughts" block; it persists after the
+  // answer completes, so it is noise to strip, never a THINKING_MARKER.
+  CITATION_NOISE:         'button.citation-marker, .xap-inline-dialog, .thinking-chain',
 };
 
 let activeSelectors = { ...SELECTORS };
